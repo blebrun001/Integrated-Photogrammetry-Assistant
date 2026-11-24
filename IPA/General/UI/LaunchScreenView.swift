@@ -19,7 +19,7 @@ struct LaunchScreenView: View {
                     .foregroundColor(.primary)
                     .padding(.top, 10)
 
-                Text(NSLocalizedString("Version 1.0.0", comment: "Splash screen version number"))
+                Text(String(format: NSLocalizedString("Version %@", comment: "Splash screen version number"), Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""))
                     .font(.subheadline)
                     .foregroundColor(.primary)
                     .padding(.top, 5)

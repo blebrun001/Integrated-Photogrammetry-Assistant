@@ -49,6 +49,7 @@ struct MarkerSheetView: View {
                         catch { self.error = error.localizedDescription }
                     }
                 }
+                .accessibilityIdentifier("markers.export")
                 Button("Print…") {
                     let document = PDFDocument(data: MarkerSheet.pdf(sideCM: side))
                     document?.printOperation(for: NSPrintInfo.shared, scalingMode: .pageScaleNone, autoRotate: false)?.run()

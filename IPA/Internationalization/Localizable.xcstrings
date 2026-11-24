@@ -9915,31 +9915,31 @@
         }
       }
     },
-    "Version 1.0.0" : {
+    "Version %@" : {
       "extractionState" : "manual",
       "localizations" : {
         "ca" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Versió 1.0.0"
+            "value" : "Versió %@"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Version 1.0.0"
+            "value" : "Version %@"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Versión 1.0.0"
+            "value" : "Versión %@"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Version 1.0.0"
+            "value" : "Version %@"
           }
         }
       }

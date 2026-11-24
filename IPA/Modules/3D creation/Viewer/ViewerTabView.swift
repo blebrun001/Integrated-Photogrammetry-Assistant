@@ -12,6 +12,7 @@ struct ViewerTabView: View {
                     panel.allowedContentTypes = ViewerViewModel.formats.compactMap { UTType(filenameExtension: $0) }
                     if panel.runModal() == .OK, let url = panel.url { model.open(url) }
                 }
+                .accessibilityIdentifier("viewer.open")
                 Text(model.source?.lastPathComponent ?? "").font(.headline)
                 Spacer()
                 Text(model.status).font(.caption)

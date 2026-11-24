@@ -25,19 +25,20 @@ final class IPAUITests: XCTestCase {
     @MainActor
     func testIndependentViewerAndMarkerTool() throws {
         let app = XCUIApplication()
-        app.launchArguments = ["-AppleLanguages", "(en)"]
+        app.launchArguments = ["-AppleLanguages", "(en)", "-ApplePersistenceIgnoreState", "YES"]
         app.launch()
         let viewer = app.buttons["Viewer"]
         XCTAssertTrue(viewer.waitForExistence(timeout: 10))
         XCTAssertFalse(app.buttons["Review"].isEnabled)
         XCTAssertFalse(app.buttons["Reconstruction"].isEnabled)
+        app.activate()
         viewer.click()
-        XCTAssertTrue(app.buttons["Open model…"].exists)
+        XCTAssertTrue(app.buttons["viewer.open"].waitForExistence(timeout: 5), app.debugDescription)
         app.buttons["Tools"].click()
         let markers = app.staticTexts["Print QR markers"]
         XCTAssertTrue(markers.waitForExistence(timeout: 5))
         markers.click()
-        XCTAssertTrue(app.buttons["Export PDF…"].exists)
+        XCTAssertTrue(app.buttons["markers.export"].waitForExistence(timeout: 5), app.debugDescription)
     }
 
     @MainActor
