@@ -8,9 +8,9 @@ Integrated Photogrammetry Assistant 2 is a macOS application developed at IPHES-
 
 ## Working with an object
 
-1. Drop photos or a folder into **Photos**. In **Review**, check thumbnails for blur, clipped highlights and clipped shadows. Adjust each tolerance, rerun analysis or select images manually.
-2. Open **Reconstruction** to choose detail, ordering, sensitivity, masking, texture compression and cleanup. Choose an output directory when starting. RealityKit processes the selected images and the resulting OBJ or USDZ opens in the Viewer.
-3. Open **Viewer** directly to inspect an existing model. Orbit the camera, switch between four surface styles, or pick two surface points. In calibration mode enter one or more known distances in centimetres and apply the mean of their scale factors. Drag in rotation mode or enter angles in degrees. **Undo edit** reverses the latest edit.
+1. Drop photos or a folder into **Photos**, then check thumbnails for blur, clipped highlights and clipped shadows. Adjust each tolerance, rerun analysis or select images manually.
+2. Open **Reconstruction** to choose detail, ordering, sensitivity, masking, texture compression and cleanup. RealityKit processes the selected images and the resulting OBJ or USDZ opens in the Viewer. Use **Export** when you are ready to save the model.
+3. Use the collapsible **Viewer** pane on the right to open and inspect an existing model alongside the workflow. Orbit the camera, switch between four surface styles, or pick two surface points. In **Manual Scale**, select pairs of points in the viewer, enter their known distances in centimetres and apply the mean of their scale factors. Drag in rotation mode or enter angles in degrees. **Undo edit** reverses the latest edit.
 4. For an OBJ with a textured Micro QR marker, **Auto Scale** provides an alternative. Select the texture and marker size, detect the symbol, then confirm the factor and choose a copy or replacement. Under **Tools → Print QR markers**, print the PDF on A4 at 100% and check the physical side length before capture.
 
 The photo selection, open model and calibration status last for the current session. Quality tolerances and reconstruction preferences persist between launches. Each model opened from disk starts with an unverified calibration status.

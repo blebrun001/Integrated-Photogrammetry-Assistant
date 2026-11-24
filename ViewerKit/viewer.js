@@ -31,6 +31,7 @@ const wire = new T.MeshBasicMaterial({wireframe:true,color:0xbcc6d0});
 const solid = new T.MeshStandardMaterial({color:0xb3afa7,side:T.DoubleSide});
 const overlay = new T.MeshBasicMaterial({wireframe:true,color:0x222222,transparent:true,opacity:0.45,depthWrite:false});
 let model, loadID = 0, calibrated = '', references = [], picks = [], saved = [], drag;
+let manualMode = false;
 let materials = new Map(), lines = [];
 const dotMaterial = new T.MeshBasicMaterial({color:0xffa900,depthTest:false});
 let dots = [];
@@ -66,13 +67,14 @@ function sync() {
     render();
     el('calibration').textContent = calibrated ? t('Calibrated')+' · '+t(calibrated) : t('Uncalibrated');
     el('bar').disabled = !calibrated;
-    el('reference').hidden = el('tool').value !== 'Calibrate';
+    el('reference').hidden = true;
     orbit.enabled = el('tool').value === 'Orbit camera';
     el('count').textContent = references.length+' '+t('reference(s)');
     el('apply').disabled = !references.length;
     el('add').disabled = picks.length !== 2;
     el('undo').disabled = !saved.length;
     for (const axis of ['x','y','z']) el(axis).value = +(model.rotation[axis]*180/Math.PI).toFixed(3);
+    bridge({action:'manualScaleState', picks:picks.length, references:references.length, calibrated:calibrated}).catch(()=>{});
 }
 function snapshot() {
     saved.push({rotation:model.rotation.clone(),scale:model.scale.clone(),calibrated});
@@ -99,7 +101,21 @@ el('tool').onchange = () => {
     el('hint').textContent = t({'Measure distance':'Click two surface points.',Calibrate:'Click two points, then add their known distance.', 'Rotate model':'Drag to rotate the model.'}[el('tool').value] || '');
 };
 el('doc').onchange = () => el('sliceLabel').hidden = el('doc').value !== 'Cross section';
-window.ipaOpen = async (url, automatic) => {
+window.ipaManualMode = enabled => {
+    manualMode = enabled;
+    if (!model) return;
+    el('tool').value = enabled ? 'Calibrate' : 'Orbit camera';
+    el('tool').onchange();
+};
+window.ipaManualPicking = picking => {
+    if (!model || !manualMode) return;
+    el('tool').value = picking ? 'Calibrate' : 'Orbit camera';
+    el('tool').onchange();
+};
+window.ipaManualAdd = cm => { el('length').value = cm; el('add').onclick(); };
+window.ipaManualApply = () => el('apply').onclick();
+window.ipaOpen = async (url, automatic, manual = manualMode) => {
+    manualMode = manual;
     const token = ++loadID;
     status('Loading model…'); el('panel').hidden = true;
     try {
@@ -122,7 +138,7 @@ window.ipaOpen = async (url, automatic) => {
         if (!materials.size) throw Error('No mesh found in the model.');
         scene.add(model); frame();
         clearPicks(); references = []; saved = []; calibrated = automatic ? 'Auto Scale' : '';
-        el('tool').value = 'Orbit camera'; el('tool').onchange();
+        el('tool').value = manualMode ? 'Calibrate' : 'Orbit camera'; el('tool').onchange();
         el('format').value = new URL(url).pathname.split('.').pop().toLowerCase();
         style(el('display').value); el('panel').hidden = false; render();
         status(loaded.missing.length ? 'Missing model resources: '+loaded.missing.join(', ') : 'Model loaded.');

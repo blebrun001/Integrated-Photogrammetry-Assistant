@@ -11,7 +11,7 @@ struct PhotogrammetryTabView: View {
     
     @ObservedObject var viewModel: PhotogrammetryViewModel
     @EnvironmentObject var photos: PhotoSession
-    private let photogrammetry = PhotogrammetryManager.shared
+    @ObservedObject private var photogrammetry = PhotogrammetryManager.shared
 
     // Available export formats
     enum ExportFormat: String, CaseIterable {
@@ -39,139 +39,105 @@ struct PhotogrammetryTabView: View {
     @State private var errorMessage: String = ""
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 15) {
-            // Parameters and export options
-            HStack {
-                (Text(NSLocalizedString("3D model name", comment: "Label for 3D model name field")) + Text(":"))
-                TextField(NSLocalizedString("3D model name", comment: "Placeholder for 3D model name field"), text: $viewModel.fileName)
-                    .textFieldStyle(RoundedBorderTextFieldStyle())
-            }
-
-            HStack {
-                Picker(NSLocalizedString("Export format", comment: "Picker label for export format"), selection: $viewModel.exportFormat) {
-                    Text(NSLocalizedString("USDZ", comment: "Export format USDZ" )).tag(ExportFormat.usdz)
-                    Text(NSLocalizedString("OBJ", comment: "Export format OBJ" )).tag(ExportFormat.obj)
-                }
-                .pickerStyle(SegmentedPickerStyle())
-            }
-
-            HStack {
-                Picker(NSLocalizedString("Detail level", comment: "Picker label for detail level"), selection: $viewModel.detail) {
-                    Text(NSLocalizedString("Preview", comment: "Detail level preview" )).tag(PhotogrammetrySession.Request.Detail.preview)
-                    Text(NSLocalizedString("Reduced", comment: "Detail level reduced" )).tag(PhotogrammetrySession.Request.Detail.reduced)
-                    Text(NSLocalizedString("Medium", comment: "Detail level medium" )).tag(PhotogrammetrySession.Request.Detail.medium)
-                    Text(NSLocalizedString("Full", comment: "Detail level full" )).tag(PhotogrammetrySession.Request.Detail.full)
-                    Text(NSLocalizedString("Raw", comment: "Detail level raw" )).tag(PhotogrammetrySession.Request.Detail.raw)
-                }
-                .pickerStyle(SegmentedPickerStyle())
-            }
-
-            HStack {
-                Picker(NSLocalizedString("Photos order", comment: "Picker label for photos ordering"), selection: $viewModel.sampleOrdering) {
-                    Text(NSLocalizedString("Unordered", comment: "Sample ordering unordered" )).tag(PhotogrammetrySession.Configuration.SampleOrdering.unordered)
-                    Text(NSLocalizedString("Sequential", comment: "Sample ordering sequential" )).tag(PhotogrammetrySession.Configuration.SampleOrdering.sequential)
-                }
-                .pickerStyle(SegmentedPickerStyle())
-            }
-
-            HStack {
-                Picker(NSLocalizedString("Sensitivity:", comment: "Picker label for feature sensitivity"), selection: $viewModel.featureSensitivity) {
-                    Text(NSLocalizedString("Normal", comment: "Feature sensitivity normal" )).tag(PhotogrammetrySession.Configuration.FeatureSensitivity.normal)
-                    Text(NSLocalizedString("High", comment: "Feature sensitivity high" )).tag(PhotogrammetrySession.Configuration.FeatureSensitivity.high)
-                }
-                .pickerStyle(SegmentedPickerStyle())
-            }
-            
-            HStack {
-                Picker(NSLocalizedString("Mask:", comment: "Picker label for mask mode"), selection: $viewModel.maskMode) {
-                    Text(NSLocalizedString("Isolate from environment", comment: "Mask option isolate from environment" )).tag(PhotogrammetryManager.MaskMode.isolate)
-                    Text(NSLocalizedString("Include environment", comment: "Mask option include environment" )).tag(PhotogrammetryManager.MaskMode.include)
-                }
-                .pickerStyle(SegmentedPickerStyle())
-            }
-
-            HStack {
-                Picker(NSLocalizedString("Texture compression:", comment: "Picker label for texture compression"), selection: $viewModel.textureCompressionLevel) {
-                    ForEach(TextureCompressionLevel.allCases, id: \.self) { level in
-                        Text(level.localizedName).tag(level)
+        VStack(alignment: .leading, spacing: 0) {
+            Form {
+                Section("Model output") {
+                    TextField("3D model name", text: $viewModel.fileName)
+                        .textFieldStyle(.roundedBorder)
+                    Picker(NSLocalizedString("Export format", comment: "Picker label for export format"), selection: $viewModel.exportFormat) {
+                        Text(NSLocalizedString("USDZ", comment: "Export format USDZ" )).tag(ExportFormat.usdz)
+                        Text(NSLocalizedString("OBJ", comment: "Export format OBJ" )).tag(ExportFormat.obj)
                     }
-                }
-                .pickerStyle(SegmentedPickerStyle())
-            }
-
-            // File cleanup options after export
-            HStack(alignment: .firstTextBaseline, spacing: 16) {
-                Text(NSLocalizedString("Files to delete after export", comment: "Label for cleanup toggles"))
-
-                Toggle(NSLocalizedString("USDA", comment: "Toggle label for deleting USDA files"), isOn: Binding(
-                    get: { PhotogrammetryManager.shared.shouldDeleteUSDAFiles },
-                    set: { PhotogrammetryManager.shared.shouldDeleteUSDAFiles = $0 }
-                ))
-                Toggle(NSLocalizedString("AO", comment: "Toggle label for deleting ambient occlusion files"), isOn: Binding(
-                    get: { PhotogrammetryManager.shared.shouldDeleteAO },
-                    set: { PhotogrammetryManager.shared.shouldDeleteAO = $0 }
-                ))
-                Toggle(NSLocalizedString("Displacement", comment: "Toggle label for deleting displacement maps"), isOn: Binding(
-                    get: { PhotogrammetryManager.shared.shouldDeleteDisplacement },
-                    set: { PhotogrammetryManager.shared.shouldDeleteDisplacement = $0 }
-                ))
-                Toggle(NSLocalizedString("Normal", comment: "Toggle label for deleting normal maps"), isOn: Binding(
-                    get: { PhotogrammetryManager.shared.shouldDeleteNormal },
-                    set: { PhotogrammetryManager.shared.shouldDeleteNormal = $0 }
-                ))
-                Toggle(NSLocalizedString("Roughness", comment: "Toggle label for deleting roughness maps"), isOn: Binding(
-                    get: { PhotogrammetryManager.shared.shouldDeleteRoughness },
-                    set: { PhotogrammetryManager.shared.shouldDeleteRoughness = $0 }
-                ))
-            }.frame(maxWidth: .infinity, alignment: .leading)
-            
-            // Capture controls
-            HStack(spacing: 20) {
-                Button(NSLocalizedString("Start", comment: "Button to start photogrammetry")) {
-                    if settings.enableSound {
-                        SoundPlayer.playSound(named: "start_capture")
+                    .pickerStyle(.segmented)
+                    Picker(NSLocalizedString("Detail level", comment: "Picker label for detail level"), selection: $viewModel.detail) {
+                        Text(NSLocalizedString("Preview", comment: "Detail level preview" )).tag(PhotogrammetrySession.Request.Detail.preview)
+                        Text(NSLocalizedString("Reduced", comment: "Detail level reduced" )).tag(PhotogrammetrySession.Request.Detail.reduced)
+                        Text(NSLocalizedString("Medium", comment: "Detail level medium" )).tag(PhotogrammetrySession.Request.Detail.medium)
+                        Text(NSLocalizedString("Full", comment: "Detail level full" )).tag(PhotogrammetrySession.Request.Detail.full)
+                        Text(NSLocalizedString("Raw", comment: "Detail level raw" )).tag(PhotogrammetrySession.Request.Detail.raw)
                     }
-                    startCapture()
+                    .pickerStyle(.segmented)
                 }
+                Section("Reconstruction settings") {
+                    Picker(NSLocalizedString("Photos order", comment: "Picker label for photos ordering"), selection: $viewModel.sampleOrdering) {
+                        Text(NSLocalizedString("Unordered", comment: "Sample ordering unordered" )).tag(PhotogrammetrySession.Configuration.SampleOrdering.unordered)
+                        Text(NSLocalizedString("Sequential", comment: "Sample ordering sequential" )).tag(PhotogrammetrySession.Configuration.SampleOrdering.sequential)
+                    }
+                    .pickerStyle(.segmented)
+                    Picker(NSLocalizedString("Sensitivity:", comment: "Picker label for feature sensitivity"), selection: $viewModel.featureSensitivity) {
+                        Text(NSLocalizedString("Normal", comment: "Feature sensitivity normal" )).tag(PhotogrammetrySession.Configuration.FeatureSensitivity.normal)
+                        Text(NSLocalizedString("High", comment: "Feature sensitivity high" )).tag(PhotogrammetrySession.Configuration.FeatureSensitivity.high)
+                    }
+                    .pickerStyle(.segmented)
+                    Picker(NSLocalizedString("Mask:", comment: "Picker label for mask mode"), selection: $viewModel.maskMode) {
+                        Text(NSLocalizedString("Isolate from environment", comment: "Mask option isolate from environment" )).tag(PhotogrammetryManager.MaskMode.isolate)
+                        Text(NSLocalizedString("Include environment", comment: "Mask option include environment" )).tag(PhotogrammetryManager.MaskMode.include)
+                    }
+                    .pickerStyle(.segmented)
+                    Picker(NSLocalizedString("Texture compression:", comment: "Picker label for texture compression"), selection: $viewModel.textureCompressionLevel) {
+                        ForEach(TextureCompressionLevel.allCases, id: \.self) { level in
+                            Text(level.localizedName).tag(level)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                }
+                Section("Files to remove from reconstruction") {
+                    HStack(spacing: 16) {
+                        Toggle("USDA", isOn: $photogrammetry.shouldDeleteUSDAFiles)
+                        Toggle("AO", isOn: $photogrammetry.shouldDeleteAO)
+                        Toggle("Displacement", isOn: $photogrammetry.shouldDeleteDisplacement)
+                        Toggle("Normal", isOn: $photogrammetry.shouldDeleteNormal)
+                        Toggle("Roughness", isOn: $photogrammetry.shouldDeleteRoughness)
+                    }
+                    .toggleStyle(.checkbox)
+                }
+            }
+            .formStyle(.grouped)
+            Divider()
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 12) {
+                    Button("Start", systemImage: "play.fill") {
+                        if settings.enableSound { SoundPlayer.playSound(named: "start_capture") }
+                        startCapture()
+                    }
+                    .buttonStyle(.borderedProminent)
                     .disabled(viewModel.isProcessing)
-                
-                Button(NSLocalizedString("Stop", comment: "Button to stop photogrammetry")) {
-                    if settings.enableSound {
-                        SoundPlayer.playSound(named: "stop_capture")
+                    Button("Stop", systemImage: "stop.fill") {
+                        if settings.enableSound { SoundPlayer.playSound(named: "stop_capture") }
+                        photogrammetry.stopCapture()
+                        viewModel.statusMessage = NSLocalizedString("Process stopped by user.", comment: "Stopped capture")
                     }
-                    photogrammetry.stopCapture()
-                    viewModel.statusMessage = NSLocalizedString("Process stopped by user.", comment: "Status when user stops photogrammetry")
-                }
-                .disabled(!viewModel.isProcessing)
-            }
-
-            // Progress feedback
-            if viewModel.isProcessing {
-                VStack(spacing: 20) {
-                    HStack {
-                        ProgressView(value: viewModel.progress)
-                            .frame(width: 300)
-                        Text(String(format: NSLocalizedString("%lld%%", comment: "Progress percentage"), Int64(viewModel.progress * 100)))
-                            .frame(width: 50, alignment: .leading)
+                    .disabled(!viewModel.isProcessing)
+                    if viewModel.isProcessing {
+                        ProgressView(value: viewModel.progress).frame(maxWidth: 180)
+                        Text(viewModel.progress, format: .percent.precision(.fractionLength(0)))
+                            .monospacedDigit()
                     }
-                    
-                    AnimatedLoader()
-                        .frame(width: 30, height: 30)
-                        .padding(.top, 1)
-                        .opacity(1)
+                    Spacer()
+                    Text("\(photos.selected.count) / \(photos.photos.count) selected")
+                        .foregroundStyle(.secondary).monospacedDigit()
+                }
+                if !viewModel.statusMessage.isEmpty {
+                    Text(viewModel.statusMessage).textSelection(.enabled)
+                }
+                if !viewModel.log.isEmpty {
+                    ScrollViewReader { proxy in
+                        ScrollView {
+                            VStack(spacing: 0) {
+                                Text(viewModel.log.joined(separator: "\n"))
+                                    .font(.system(.caption, design: .monospaced)).textSelection(.enabled)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                Color.clear.frame(height: 1).id("logEnd")
+                            }
+                        }
+                        .onAppear { proxy.scrollTo("logEnd", anchor: .bottom) }
+                        .onChange(of: viewModel.log.count) { proxy.scrollTo("logEnd", anchor: .bottom) }
+                    }
+                    .frame(height: 84)
                 }
             }
-
-            // Status message
-            Text(viewModel.statusMessage)
-                .foregroundColor(.blue)
-                .padding(.top, 10)
-
-            ScrollView { Text(viewModel.log.joined(separator: "\n")).font(.system(.caption, design: .monospaced)).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading) }
-            Spacer(minLength: 0)
+            .padding(16)
         }
-        .padding()
-        .frame(maxWidth: .infinity, alignment: .leading)
         .alert(NSLocalizedString("Error", comment: "Generic error title"), isPresented: $showErrorAlert) {
             Button(NSLocalizedString("OK", comment: "Dismiss error alert"), role: .cancel) { }
         } message: {
@@ -186,12 +152,15 @@ struct PhotogrammetryTabView: View {
             viewModel.statusMessage = "Select photos and enter a valid model name."
             return
         }
-        let panel = NSOpenPanel()
-        panel.prompt = "Choose output folder"
-        panel.canChooseDirectories = true
-        panel.canChooseFiles = false
-        panel.canCreateDirectories = true
-        guard panel.runModal() == .OK, let output = panel.url else { return }
+        let output = FileManager.default.temporaryDirectory
+            .appendingPathComponent("IPA-Reconstruction-" + UUID().uuidString, isDirectory: true)
+        do {
+            try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
+        } catch {
+            errorMessage = error.localizedDescription
+            showErrorAlert = true
+            return
+        }
         viewModel.log = []
         viewModel.savePreferences()
         viewModel.isProcessing = true
@@ -228,6 +197,7 @@ struct PhotogrammetryTabView: View {
                 onError: { message in
                     DispatchQueue.main.async {
                         self.viewModel.isProcessing = false
+                        try? FileManager.default.removeItem(at: output)
                         self.errorMessage = message
                         self.viewModel.statusMessage = message
                         self.showErrorAlert = true

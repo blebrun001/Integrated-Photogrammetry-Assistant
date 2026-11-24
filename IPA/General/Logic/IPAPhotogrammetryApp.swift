@@ -28,6 +28,7 @@ struct IPAPhotogrammetryApp: App {
                 .environmentObject(boneFolderViewModel)
                 .environmentObject(settings)
         }
+        .defaultSize(width: 1440, height: 850)
         Settings {
             SettingsView()
                 .environmentObject(settings)

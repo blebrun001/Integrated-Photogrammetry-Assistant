@@ -1,11 +1,62 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' data: blob:; worker-src blob:"><meta name="viewport" content="width=device-width,initial-scale=1"><title>IPA Viewer</title>
 <style>
-:root{color-scheme:light dark;font:13px -apple-system,BlinkMacSystemFont,sans-serif}*{box-sizing:border-box}body{margin:0;display:flex;height:100vh}main{flex:1;min-width:0;position:relative;background:#383d43}canvas{display:block;width:100%;height:100%}aside{width:230px;padding:12px;overflow:auto}fieldset{border:0;border-bottom:1px solid #8885;padding:8px 0 14px;margin:0 0 12px}legend{font-weight:600}label,select,button{margin:3px 0}select{max-width:100%}button,input,select{font:inherit}input[type=number]{width:58px}output{display:block;margin:6px 0}#status{position:absolute;left:12px;bottom:8px;color:white;background:#24272be8;padding:4px 7px;border-radius:4px;max-width:92%;pointer-events:none}[hidden]{display:none!important}
+:root {
+  color-scheme: light dark;
+  font: 13px/1.45 -apple-system, BlinkMacSystemFont, sans-serif;
+  --panel: #f5f6f8;
+  --surface: #fff;
+  --ink: #1d2833;
+  --muted: #485563;
+  --line: #c8cdd3;
+  --hover: #e8edf1;
+  --focus: #1263bc;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --panel: #25292e;
+    --surface: #333940;
+    --ink: #f1f3f5;
+    --muted: #c2cad3;
+    --line: #59616b;
+    --hover: #414a54;
+    --focus: #86c2ff;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; display: flex; height: 100vh; color: var(--ink); }
+main { flex: 1; min-width: 0; position: relative; background: #383d43; }
+canvas { display: block; width: 100%; height: 100%; }
+aside { width: 254px; padding: 16px; overflow: auto; background: var(--panel); }
+fieldset { border: 0; border-bottom: 1px solid var(--line); padding: 0 0 14px; margin: 0 0 14px; min-width: 0; }
+fieldset:last-child { border-bottom: 0; margin-bottom: 0; }
+legend { font-weight: 650; font-size: 14px; padding: 0 0 6px; }
+label { display: block; margin: 5px 0; }
+button, input, select { color: var(--ink); font: inherit; }
+select, button, input[type=number] {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 6px;
+  min-height: 29px; padding: 3px 7px; margin: 3px 0;
+}
+select { width: 100%; cursor: pointer; }
+button { cursor: pointer; }
+button:enabled:hover, select:hover { background-color: var(--hover); }
+button:disabled { opacity: .55; cursor: default; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+#axes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+#axes label { margin: 0; font-variant-numeric: tabular-nums; }
+#axes input { width: 100%; }
+#length { width: 72px; }
+output, #hint { display: block; margin: 6px 0 0; color: var(--muted); }
+#hint:empty { display: none; }
+#status {
+  position: absolute; left: 12px; bottom: 12px; color: white; background: #24272bed;
+  padding: 5px 10px; border-radius: 6px; max-width: calc(100% - 24px); pointer-events: none;
+}
+[hidden] { display: none !important; }
 </style></head><body><main><canvas id="viewport"></canvas><output id="status" role="status">Open a 3D model to begin.</output></main>
-<aside hidden id="panel"><fieldset><legend>Display</legend><select id="display"><option>Texture</option><option>Solid</option><option>Wireframe</option><option>Texture + wireframe</option></select><output id="calibration"></output></fieldset>
-<fieldset><legend>Interaction</legend><select id="tool"><option>Orbit camera</option><option>Measure distance</option><option>Calibrate</option><option>Rotate model</option></select><p id="hint"></p><div id="reference" hidden><label>Reference <input type="number" id="length" min="0" step="any"> cm</label><button id="add">Add reference</button><output id="count"></output><button id="apply">Apply calibration</button></div></fieldset>
+<aside hidden id="panel"><fieldset><legend id="display-label">Display</legend><select id="display" aria-labelledby="display-label"><option>Texture</option><option>Solid</option><option>Wireframe</option><option>Texture + wireframe</option></select><output id="calibration"></output></fieldset>
+<fieldset><legend id="tool-label">Interaction</legend><select id="tool" aria-labelledby="tool-label"><option>Orbit camera</option><option>Measure distance</option><option hidden>Calibrate</option><option>Rotate model</option></select><p id="hint"></p><div id="reference" hidden><label>Reference <input type="number" id="length" min="0" step="any"> cm</label><button id="add">Add reference</button><output id="count"></output><button id="apply">Apply calibration</button></div></fieldset>
 <fieldset><legend>Model rotation (°)</legend><div id="axes"></div><button id="undo">Undo edit</button></fieldset>
-<fieldset><legend>Save model</legend><select id="format"></select> <button id="save">Save as…</button></fieldset>
-<fieldset><legend>Scientific illustration</legend><select id="doc"><option>Orthographic view</option><option>Multiview plate</option><option>Cross section</option><option>Silhouette</option><option>Profile</option></select><select id="direction"><option>Front</option><option>Side</option><option>Top</option></select><label id="sliceLabel" hidden>Section position <input type="range" id="slice" value="50" min="1" max="99"></label><label><input type="checkbox" id="bar" checked> Scale bar (cm)</label><button id="illustrate">Export PNG…</button></fieldset></aside>
+<fieldset><legend id="format-label">Save model</legend><select id="format" aria-labelledby="format-label"></select> <button id="save">Save as…</button></fieldset>
+<fieldset><legend id="doc-label">Scientific illustration</legend><select id="doc" aria-labelledby="doc-label"><option>Orthographic view</option><option>Multiview plate</option><option>Cross section</option><option>Silhouette</option><option>Profile</option></select><label for="direction">View direction</label><select id="direction"><option>Front</option><option>Side</option><option>Top</option></select><label id="sliceLabel" hidden>Section position <input type="range" id="slice" value="50" min="1" max="99"></label><label><input type="checkbox" id="bar" checked> Scale bar (cm)</label><button id="illustrate">Export PNG…</button></fieldset></aside>
 <script src="viewer.js"></script></body></html>

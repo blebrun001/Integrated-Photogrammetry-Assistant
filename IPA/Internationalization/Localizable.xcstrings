@@ -1,6 +1,245 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Manual Scale" : { "extractionState" : "manual", "localizations" : {
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Échelle manuelle" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Escala manual" } },
+      "ca" : { "stringUnit" : { "state" : "translated", "value" : "Escala manual" } } } },
+    "Place points" : { "extractionState" : "manual", "localizations" : {
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Placer les points" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Colocar puntos" } },
+      "ca" : { "stringUnit" : { "state" : "translated", "value" : "Col·locar punts" } } } },
+    "Distance (cm)" : { "extractionState" : "manual", "localizations" : {
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Distance (cm)" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Distancia (cm)" } },
+      "ca" : { "stringUnit" : { "state" : "translated", "value" : "Distància (cm)" } } } },
+    "Points selected: %lld / 2" : { "extractionState" : "manual", "localizations" : {
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Points sélectionnés : %lld / 2" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Puntos seleccionados: %lld / 2" } },
+      "ca" : { "stringUnit" : { "state" : "translated", "value" : "Punts seleccionats: %lld / 2" } } } },
+    "Export" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Exporter" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Exportar" } },
+        "ca" : { "stringUnit" : { "state" : "translated", "value" : "Exportar" } }
+      }
+    },
+    "Files to remove from reconstruction" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Fichiers à supprimer de la reconstruction" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Archivos que eliminar de la reconstrucción" } },
+        "ca" : { "stringUnit" : { "state" : "translated", "value" : "Fitxers que cal eliminar de la reconstrucció" } }
+      }
+    },
+    "View direction" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Direction de vue"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dirección de vista"
+          }
+        },
+        "ca" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Direcció de la vista"
+          }
+        }
+      }
+    },
+    "Source photos" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photos sources"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fotos de origen"
+          }
+        },
+        "ca" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fotos d’origen"
+          }
+        }
+      }
+    },
+    "Original files stay in their current location." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les fichiers originaux restent à leur emplacement."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Los archivos originales permanecen en su ubicación."
+          }
+        },
+        "ca" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Els fitxers originals es mantenen a la seva ubicació."
+          }
+        }
+      }
+    },
+    "Photo quality" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qualité des photos"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Calidad de las fotos"
+          }
+        },
+        "ca" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qualitat de les fotos"
+          }
+        }
+      }
+    },
+    "Model output" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modèle à exporter"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modelo de salida"
+          }
+        },
+        "ca" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Model de sortida"
+          }
+        }
+      }
+    },
+    "Reconstruction settings" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paramètres de reconstruction"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajustes de reconstrucción"
+          }
+        },
+        "ca" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paràmetres de reconstrucció"
+          }
+        }
+      }
+    },
+    "Add photos to review them." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajoutez des photos pour les examiner."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Añade fotos para revisarlas."
+          }
+        },
+        "ca" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Afegeix fotos per revisar-les."
+          }
+        }
+      }
+    },
+    "Select photos for reconstruction." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sélectionnez des photos pour la reconstruction."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Selecciona fotos para la reconstrucción."
+          }
+        },
+        "ca" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Selecciona fotos per a la reconstrucció."
+          }
+        }
+      }
+    },
+    "Open an OBJ model to use automatic scaling." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrez un modèle OBJ pour utiliser la mise à l’échelle automatique."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abre un modelo OBJ para usar el escalado automático."
+          }
+        },
+        "ca" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Obre un model OBJ per utilitzar l’escalat automàtic."
+          }
+        }
+      }
+    },
     "Photos" : {
       "extractionState" : "manual",
       "localizations" : {

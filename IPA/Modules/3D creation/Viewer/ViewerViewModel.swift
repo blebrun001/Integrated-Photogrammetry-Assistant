@@ -51,8 +51,12 @@ final class ViewerViewModel: NSObject, ObservableObject, WKScriptMessageHandlerW
     let web: WKWebView
     @Published var source: URL?
     @Published var status = ""
+    @Published var manualPoints = 0
+    @Published var manualReferences = 0
+    @Published var calibration = ""
     private var ready = false
     private var automatic = false
+    private var manualMode = false
 
     override init() {
         let config = WKWebViewConfiguration()
@@ -73,6 +77,9 @@ final class ViewerViewModel: NSObject, ObservableObject, WKScriptMessageHandlerW
     }
 
     func open(_ url: URL, automatic: Bool = false) {
+        manualPoints = 0
+        manualReferences = 0
+        calibration = ""
         source = url
         self.automatic = automatic
         resources.source = url
@@ -80,13 +87,48 @@ final class ViewerViewModel: NSObject, ObservableObject, WKScriptMessageHandlerW
         load()
     }
 
+    func setManualMode(_ enabled: Bool) {
+        manualMode = enabled
+        if ready { callViewer("window.ipaManualMode(enabled)", arguments: ["enabled": enabled]) }
+    }
+
+    func setManualPicking(_ picking: Bool) {
+        callViewer("window.ipaManualPicking(picking)", arguments: ["picking": picking])
+    }
+
+    func addManualReference(_ distance: Double) {
+        callViewer("window.ipaManualAdd(distance)", arguments: ["distance": distance])
+    }
+
+    func applyManualScale() {
+        callViewer("await window.ipaManualApply()")
+    }
+
+    private func callViewer(_ script: String, arguments: [String: Any] = [:]) {
+        Task {
+            do { _ = try await web.callAsyncJavaScript(script, arguments: arguments, in: nil, contentWorld: .page) }
+            catch { status = error.localizedDescription }
+        }
+    }
+
+    func export(format: String) {
+        guard source != nil, Self.formats.contains(format) else { return }
+        Task {
+            do {
+                _ = try await web.callAsyncJavaScript(
+                    "document.getElementById('format').value = format; await document.getElementById('save').onclick();",
+                    arguments: ["format": format], in: nil, contentWorld: .page)
+            } catch { status = error.localizedDescription }
+        }
+    }
+
     private func load() {
         guard ready, let source else { return }
         let path = URL(string: "ipaasset://local")!.appendingPathComponent(resources.key).appendingPathComponent(source.lastPathComponent)
-        let arguments: [String: Any] = ["path": path.absoluteString, "calibrated": automatic]
+        let arguments: [String: Any] = ["path": path.absoluteString, "calibrated": automatic, "manual": manualMode]
         Task {
             do {
-                _ = try await web.callAsyncJavaScript("await window.ipaOpen(path, calibrated)", arguments: arguments, in: nil, contentWorld: .page)
+                _ = try await web.callAsyncJavaScript("await window.ipaOpen(path, calibrated, manual)", arguments: arguments, in: nil, contentWorld: .page)
             } catch { status = error.localizedDescription }
         }
     }
@@ -94,7 +136,14 @@ final class ViewerViewModel: NSObject, ObservableObject, WKScriptMessageHandlerW
     func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage, replyHandler: @escaping (Any?, String?) -> Void) {
         guard message.frameInfo.isMainFrame, message.frameInfo.request.url?.host == "local",
               let info = message.body as? [String: Any], let action = info["action"] as? String else { replyHandler(nil, "Invalid viewer request"); return }
-        if action == "ready" { ready = true; replyHandler(true, nil); load(); return }
+        if action == "manualScaleState" {
+            manualPoints = info["picks"] as? Int ?? 0
+            manualReferences = info["references"] as? Int ?? 0
+            calibration = info["calibrated"] as? String ?? ""
+            replyHandler(true, nil)
+            return
+        }
+        if action == "ready" { ready = true; replyHandler(true, nil); setManualMode(manualMode); load(); return }
         if action == "confirm" {
             let alert = NSAlert()
             alert.messageText = info["text"] as? String ?? ""
@@ -106,7 +155,9 @@ final class ViewerViewModel: NSObject, ObservableObject, WKScriptMessageHandlerW
         guard action == "save", let source, let ext = info["ext"] as? String,
               (Self.formats + ["png"]).contains(ext), let payload = info["data"] as? String, let data = Data(base64Encoded: payload), !data.isEmpty else { replyHandler(nil, "Invalid export"); return }
         let panel = NSSavePanel()
-        panel.directoryURL = source.deletingLastPathComponent()
+        panel.directoryURL = source.path.hasPrefix(FileManager.default.temporaryDirectory.path)
+            ? FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
+            : source.deletingLastPathComponent()
         panel.nameFieldStringValue = source.deletingPathExtension().lastPathComponent + "-edited." + ext
         panel.allowedContentTypes = [UTType(filenameExtension: ext) ?? .data]
         guard panel.runModal() == .OK, let destination = panel.url else { replyHandler(false, nil); return }

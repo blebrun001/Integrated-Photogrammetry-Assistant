@@ -65,15 +65,17 @@ test('viewer calibration, orientation, dimensional round trips and illustrations
     }
 
     await open('test.obj');
-    await page.selectOption('#tool','Calibrate');
+    await page.evaluate(() => window.ipaManualMode(true));
+    assert.equal(await page.locator('#panel').isVisible(), true);
     const rect = await page.locator('canvas').boundingBox();
     const click = dx=>page.mouse.click(rect.x+rect.width/2+dx,rect.y+rect.height/2);
     for (const cm of [2,4]) {
         await click(-15); await click(15);
-        await page.fill('#length',String(cm)); await page.click('#add');
+        await page.evaluate(value => window.ipaManualAdd(value), cm);
     }
     assert.match(await page.locator('#count').textContent(),/^2 /);
-    await page.click('#apply');
+    await page.evaluate(() => window.ipaManualApply());
+    await page.evaluate(() => window.ipaManualMode(false));
     assert(confirmations.some(s=>s.includes('Replace automatic calibration')));
     assert.equal(await page.locator('#calibration').textContent(),'Calibrated · Manual');
     await save('obj'); assert(bounds()[0]>2);
