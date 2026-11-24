@@ -69,7 +69,25 @@ test('viewer calibration, orientation, dimensional round trips and illustrations
     assert.equal(await page.locator('#panel').isVisible(), true);
     const rect = await page.locator('canvas').boundingBox();
     const click = dx=>page.mouse.click(rect.x+rect.width/2+dx,rect.y+rect.height/2);
-    for (const cm of [2,4]) {
+    await click(-15); await click(15);
+    // Inspect the rendered canvas, not just the internal selection count.
+    const screenshot = await page.locator('canvas').screenshot();
+    const orangePixels = await page.evaluate(async bytes => {
+        const image = new Image(); image.src = 'data:image/png;base64,' + bytes; await image.decode();
+        const c = document.createElement('canvas'); c.width = image.width; c.height = image.height;
+        const ctx = c.getContext('2d'); ctx.drawImage(image, 0, 0);
+        const pixels = ctx.getImageData(0, 0, c.width, c.height).data;
+        let count = 0;
+        for (let i = 0; i < pixels.length; i += 4)
+            if (pixels[i] > 230 && pixels[i+1] > 120 && pixels[i+1] < 200 && pixels[i+2] < 40) count++;
+        return count;
+    }, screenshot.toString('base64'));
+    assert(orangePixels > 50, 'both measurement markers are visible on the model');
+    await page.evaluate(() => window.ipaManualPicking(false));
+    await page.evaluate(() => window.ipaManualPicking(true));
+    assert.equal(await page.locator('#add').isEnabled(), true, 'orbiting preserves selected points');
+    await page.evaluate(() => window.ipaManualAdd(2));
+    for (const cm of [4]) {
         await click(-15); await click(15);
         await page.evaluate(value => window.ipaManualAdd(value), cm);
     }

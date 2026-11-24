@@ -21,7 +21,16 @@ scene.background = new T.Color(0x383d43);
 const camera = new T.PerspectiveCamera(38,1,0.01,10000);
 const orbit = new OrbitControls(camera,canvas);
 const ray = new T.Raycaster();
-function render() { renderer.render(scene,camera); }
+let dots = [];
+function render() {
+    // Keep markers legible at every zoom level, including after orbiting.
+    for (const dot of dots) {
+        const distance = camera.position.distanceTo(dot.position);
+        const radius = 7 * 2 * distance * Math.tan(T.MathUtils.degToRad(camera.fov / 2)) / Math.max(canvas.clientHeight, 1);
+        dot.scale.setScalar(radius);
+    }
+    renderer.render(scene,camera);
+}
 orbit.addEventListener('change',render);
 const fill = new T.HemisphereLight(0xffffff,0xaaaab0,2.4);
 const key = new T.DirectionalLight(0xffffff,2);
@@ -33,8 +42,7 @@ const overlay = new T.MeshBasicMaterial({wireframe:true,color:0x222222,transpare
 let model, loadID = 0, calibrated = '', references = [], picks = [], saved = [], drag;
 let manualMode = false;
 let materials = new Map(), lines = [];
-const dotMaterial = new T.MeshBasicMaterial({color:0xffa900,depthTest:false});
-let dots = [];
+const dotMaterial = new T.MeshBasicMaterial({color:0xffa900,depthTest:false,depthWrite:false});
 
 function frame() {
     const box = new T.Box3().setFromObject(model,true);
@@ -97,7 +105,8 @@ for (const axis of ['x','y','z']) {
 for (const ext of ['obj','glb','gltf','ply','stl','usdz','3mf']) el('format').add(new Option(ext.toUpperCase(),ext));
 el('display').onchange = () => { style(el('display').value); render(); };
 el('tool').onchange = () => {
-    clearPicks(); sync();
+    if (!manualMode) clearPicks();
+    sync();
     el('hint').textContent = t({'Measure distance':'Click two surface points.',Calibrate:'Click two points, then add their known distance.', 'Rotate model':'Drag to rotate the model.'}[el('tool').value] || '');
 };
 el('doc').onchange = () => el('sliceLabel').hidden = el('doc').value !== 'Cross section';
@@ -155,8 +164,8 @@ canvas.addEventListener('pointerdown', e=>{
     if (!hit) return;
     if (picks.length === 2) clearPicks();
     picks.push(hit.point.clone());
-    const dot = new T.Mesh(new T.SphereGeometry(camera.position.distanceTo(orbit.target)/260,10,8),dotMaterial);
-    dot.position.copy(hit.point); scene.add(dot); dots.push(dot);
+    const dot = new T.Mesh(new T.SphereGeometry(1,16,12),dotMaterial);
+    dot.position.copy(hit.point); dot.renderOrder = 1000; scene.add(dot); dots.push(dot);
     if (picks.length === 2) {
         const d = picks[0].distanceTo(picks[1]);
         status(calibrated ? d.toLocaleString(undefined,{maximumSignificantDigits:6})+' cm' : 'Two points selected · calibration required for cm.');
@@ -171,11 +180,13 @@ canvas.addEventListener('pointermove', e=>{
 });
 canvas.addEventListener('lostpointercapture',()=>drag=null);
 el('add').onclick = () => {
+    if (picks.length !== 2) return;
     const cm = el('length').valueAsNumber, measured = picks[0].distanceTo(picks[1]);
     if (!(cm>0 && measured>0)) return status('Enter a positive distance and choose distinct points.');
     references.push(cm/measured); clearPicks(); sync();
 };
 el('apply').onclick = async () => {
+    if (!references.length) return;
     if (calibrated === 'Auto Scale' && !await bridge({action:'confirm',text:t('Replace automatic calibration with these manual references?')})) return;
     snapshot();
     model.scale.multiplyScalar(references.reduce((a,b)=>a+b,0)/references.length);
