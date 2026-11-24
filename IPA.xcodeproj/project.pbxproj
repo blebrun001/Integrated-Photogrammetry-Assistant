@@ -26,6 +26,7 @@
 /* Begin PBXFileReference section */
 		42CCC0F32D55182C0037123A /* Integrated Photogrammetry Assistant.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Integrated Photogrammetry Assistant.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		42CCC1042D55182D0037123A /* IPATests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = IPATests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		42CCC10E2D55182D0037123A /* IPAUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = IPAUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -86,6 +87,7 @@
 			children = (
 				42CCC0F32D55182C0037123A /* Integrated Photogrammetry Assistant.app */,
 				42CCC1042D55182D0037123A /* IPATests.xctest */,
+				42CCC10E2D55182D0037123A /* IPAUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -158,6 +160,7 @@
 			packageProductDependencies = (
 			);
 			productName = IPAUITests;
+			productReference = 42CCC10E2D55182D0037123A /* IPAUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
 /* End PBXNativeTarget section */
@@ -429,7 +432,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.0.0;
+				MARKETING_VERSION = 2.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = org.bricelebrun.ipa;
 				PRODUCT_MODULE_NAME = IPA;
 				PRODUCT_NAME = "Integrated Photogrammetry Assistant";
@@ -474,7 +477,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.0.0;
+				MARKETING_VERSION = 2.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = org.bricelebrun.ipa;
 				PRODUCT_MODULE_NAME = IPA;
 				PRODUCT_NAME = "Integrated Photogrammetry Assistant";

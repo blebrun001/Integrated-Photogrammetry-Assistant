@@ -21,10 +21,12 @@ final class UploadState: ObservableObject {
 struct DataverseUploadView<Settings: SettingsProviding>: View where Settings: ObservableObject {
     @StateObject private var state = UploadState()
     @ObservedObject private var settings: Settings
+    private let suggestedFile: URL?
     private let clientType: DVClient.Type
 
     init(adapter: Settings,
-         client: DVClient.Type = DataverseClient.self) {
+         client: DVClient.Type = DataverseClient.self, suggestedFile: URL? = nil) {
+        self.suggestedFile = suggestedFile
         _settings = ObservedObject(wrappedValue: adapter)
         self.clientType = client
     }
@@ -198,6 +200,12 @@ struct DataverseUploadView<Settings: SettingsProviding>: View where Settings: Ob
         GroupBox("Selection & Summary") {
             SectionCaption(text: NSLocalizedString("Review the staged files and the command that the app will run.", comment: "Selection help text"))
             VStack(alignment: .leading, spacing: 16) {
+                if let suggestedFile, !state.items.contains(where: { $0.path == suggestedFile.path }) {
+                    Button("Add " + suggestedFile.lastPathComponent) {
+                        let bookmark = try? suggestedFile.bookmarkData(options: .withSecurityScope, includingResourceValuesForKeys: nil, relativeTo: nil)
+                        state.items.append(UploadItem(path: suggestedFile.path, bookmark: bookmark))
+                    }
+                }
                 FileListView(items: $state.items)
                 Divider()
                 CommandPreviewView(server: settings.server,

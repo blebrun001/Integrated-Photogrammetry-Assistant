@@ -32,7 +32,7 @@ public class OBJScaler {
         var scaledLines: [String] = []
         for line in lines {
             // use only lines "v " et "vn "
-            if line.hasPrefix("v ") || line.hasPrefix("vn ") {
+            if line.hasPrefix("v ") {
                 let components = line.split(separator: " ")
                 if components.count >= 4 {
                     // Parse x, y, z
@@ -46,7 +46,7 @@ public class OBJScaler {
                     let newY = y * scaleFactor
                     let newZ = z * scaleFactor
                     let prefix = components[0]  // "v" ou "vn"
-                    scaledLines.append("\(prefix) \(newX) \(newY) \(newZ)")
+                    scaledLines.append((["\(prefix)", "\(newX)", "\(newY)", "\(newZ)"] + components.dropFirst(4).map(String.init)).joined(separator: " "))
                 } else {
                     scaledLines.append(String(line))
                 }
@@ -65,17 +65,13 @@ public class OBJScaler {
         } else {
             //if not, create a new file (ex: "scaled_myfile.obj")
             let newFileName = "scaled_" + file.lastPathComponent
-            let newFileURL = file.deletingLastPathComponent().appendingPathComponent(newFileName)
+            var newFileURL = file.deletingLastPathComponent().appendingPathComponent(newFileName)
             if fileManager.fileExists(atPath: newFileURL.path) {
-                try fileManager.removeItem(at: newFileURL)
+                newFileURL = file.deletingLastPathComponent().appendingPathComponent("scaled_" + UUID().uuidString + "_" + file.lastPathComponent)
             }
             try newOBJContent.write(to: newFileURL, atomically: true, encoding: .utf8)
             destination = newFileURL
         }
-
-        // update last generated obj file
-        PhotogrammetryManager.shared.lastGeneratedOBJ = destination
-        print("lastGeneratedOBJ updated: \(destination.path)")
 
         return destination
     }

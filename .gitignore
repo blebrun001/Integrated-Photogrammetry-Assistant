@@ -74,3 +74,4 @@ playground.xcworkspace
 *.lock
 *.xcuserstate
 *.xcworkspace/xcuserdata/
+node_modules/

@@ -11,16 +11,24 @@ final class OBJMeshAnalyzer {
         let uv: SIMD2<Double>
     }
 
-    func measureDistance(objURL: URL, boundingBox: CGRect, textureSize: CGSize) throws -> AutoScaleMeasurement {
+    func measureDistance(objURL: URL, boundingBox: CGRect, textureSize: CGSize, corners: [CGPoint] = []) throws -> AutoScaleMeasurement {
         let mesh = try parseMesh(at: objURL)
 
         let width = Double(textureSize.width)
         let height = Double(textureSize.height)
 
+        guard width > 0, height > 0 else { throw AutoScaleError.noVerticesInRegion }
+        if corners.count == 4 {
+            let uv = corners.map { SIMD2<Double>($0.x / width, $0.y / height) }
+            let points = uv.compactMap { surfacePoint(at: $0, in: mesh) }
+            guard points.count == 4 else { throw AutoScaleError.noVerticesInRegion }
+            let diagonal = ((points[0] - points[2]).length + (points[1] - points[3]).length) / 2
+            return AutoScaleMeasurement(distance: diagonal, uv1: uv[0], uv2: uv[2])
+        }
         let uMin = Double(boundingBox.minX) / width
         let uMax = Double(boundingBox.maxX) / width
-        let vMax = 1.0 - Double(boundingBox.minY) / height
-        let vMin = 1.0 - Double(boundingBox.maxY) / height
+        let vMin = Double(boundingBox.minY) / height
+        let vMax = Double(boundingBox.maxY) / height
 
         let candidates = collectCandidates(mesh: mesh, uMin: uMin, uMax: uMax, vMin: vMin, vMax: vMax)
         guard candidates.count >= 2 else {
@@ -43,6 +51,29 @@ final class OBJMeshAnalyzer {
         }
 
         return AutoScaleMeasurement(distance: maxDistance, uv1: bestPair?.0, uv2: bestPair?.1)
+    }
+
+    // Locate each detected marker corner inside a UV triangle, even on a coarse mesh.
+    private func surfacePoint(at point: SIMD2<Double>, in mesh: OBJMesh) -> SIMD3<Double>? {
+        func cross(_ a: SIMD2<Double>, _ b: SIMD2<Double>) -> Double { a.x * b.y - a.y * b.x }
+        for face in mesh.faces where face.vertexIndices.count >= 3 && face.vertexIndices.count == face.textureIndices.count {
+            for i in 1..<(face.vertexIndices.count - 1) {
+                let indices = [0, i, i + 1]
+                let tex = indices.compactMap { face.textureIndices[$0] }
+                let vertices = indices.map { face.vertexIndices[$0] }
+                guard tex.count == 3, tex.allSatisfy(mesh.texcoords.indices.contains),
+                      vertices.allSatisfy(mesh.vertices.indices.contains) else { continue }
+                let origin = mesh.texcoords[tex[0]]
+                let u = mesh.texcoords[tex[1]] - origin, v = mesh.texcoords[tex[2]] - origin
+                let determinant = cross(u,v)
+                guard abs(determinant) > 1e-15 else { continue }
+                let b = cross(point-origin,v) / determinant, c = cross(u,point-origin) / determinant
+                if b >= -1e-7, c >= -1e-7, b+c <= 1.0000001 {
+                    return mesh.vertices[vertices[0]]*(1-b-c) + mesh.vertices[vertices[1]]*b + mesh.vertices[vertices[2]]*c
+                }
+            }
+        }
+        return nil
     }
 
     func parseMesh(at url: URL) throws -> OBJMesh {
@@ -74,11 +105,11 @@ final class OBJMeshAnalyzer {
                 var textureIndices: [Int?] = []
                 for token in tokens {
                     let parts = token.split(separator: "/", omittingEmptySubsequences: false)
-                    if let vIndex = Int(parts[0]) {
-                        vertexIndices.append(vIndex - 1)
+                    if let first = parts.first, let vIndex = Int(first) {
+                        vertexIndices.append(vIndex < 0 ? vertices.count + vIndex : vIndex - 1)
                     }
-                    if parts.indices.contains(1), let tIndex = Int(parts[1]), tIndex > 0 {
-                        textureIndices.append(tIndex - 1)
+                    if parts.indices.contains(1), let tIndex = Int(parts[1]), tIndex != 0 {
+                        textureIndices.append(tIndex < 0 ? texcoords.count + tIndex : tIndex - 1)
                     } else {
                         textureIndices.append(nil)
                     }
@@ -95,7 +126,7 @@ final class OBJMeshAnalyzer {
         for face in mesh.faces {
             for (vertexIndex, texIndex) in zip(face.vertexIndices, face.textureIndices) {
                 guard let texIndex else { continue }
-                guard texIndex < mesh.texcoords.count else { continue }
+                guard mesh.vertices.indices.contains(vertexIndex), mesh.texcoords.indices.contains(texIndex) else { continue }
                 let uv = mesh.texcoords[texIndex]
                 if uv.x >= uMin && uv.x <= uMax && uv.y >= vMin && uv.y <= vMax {
                     let vertex = mesh.vertices[vertexIndex]

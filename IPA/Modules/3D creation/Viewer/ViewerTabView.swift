@@ -1,50 +1,28 @@
-//  ViewerTabView.swift
-//  View embedding a WKWebView to interact with an online 3D viewer and extract measurements.
-
 import SwiftUI
 import WebKit
+import UniformTypeIdentifiers
 
 struct ViewerTabView: View {
-    @EnvironmentObject var objScalerViewModel: OBJScalerViewModel
-    @StateObject private var viewerViewModel = ViewerViewModel.shared
-    
+    @ObservedObject var model: ViewerViewModel
     var body: some View {
-        VStack {
-            // Embedded web view displaying the 3D viewer
-            WebViewContainer(webView: viewerViewModel.webView)
-                .frame(minWidth: 800, minHeight: 600)
-            
-            // Action buttons
+        VStack(alignment: .leading) {
             HStack {
-                Button("Reload page") {
-                    viewerViewModel.reload()
+                Button("Open model…") {
+                    let panel = NSOpenPanel()
+                    panel.allowedContentTypes = ViewerViewModel.formats.compactMap { UTType(filenameExtension: $0) }
+                    if panel.runModal() == .OK, let url = panel.url { model.open(url) }
                 }
-                .padding()
-                
-                Button("Extract measure") {
-                    viewerViewModel.retrieveMeasureValue { measureValue in
-                        if let value = measureValue {
-                            objScalerViewModel.uncalibrated = value
-                        }
-                    }
-                }
-                .padding()
-            }
-        }
+                Text(model.source?.lastPathComponent ?? "").font(.headline)
+                Spacer()
+                Text(model.status).font(.caption)
+            }.padding(.horizontal)
+            ViewerSurface(web: model.web)
+        }.padding(.top, 8)
     }
 }
 
-// Wrapper for embedding a WKWebView into SwiftUI
-struct WebViewContainer: NSViewRepresentable {
-    let webView: WKWebView?
-    
-    func makeNSView(context: Context) -> WKWebView {
-        if let existingWebView = webView {
-            return existingWebView
-        }
-        return WKWebView()
-    }
-    
-    func updateNSView(_ nsView: WKWebView, context: Context) {
-    }
+private struct ViewerSurface: NSViewRepresentable {
+    let web: WKWebView
+    func makeNSView(context: Context) -> WKWebView { web }
+    func updateNSView(_ nsView: WKWebView, context: Context) {}
 }

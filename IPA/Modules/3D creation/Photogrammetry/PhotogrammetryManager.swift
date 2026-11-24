@@ -2,6 +2,7 @@
 //  Singleton manager that handles photogrammetry sessions, file exports, compression, and cleanup logic.
 
 import Foundation
+import SwiftUI
 import Combine
 import RealityKit
 import AppKit
@@ -12,14 +13,12 @@ public class PhotogrammetryManager: ObservableObject {
     static let shared = PhotogrammetryManager()
     
     // Flags for post-processing cleanup
-    var shouldDeleteUSDAFiles = true
-    var shouldDeleteAO = false
-    var shouldDeleteDisplacement = false
-    var shouldDeleteNormal = false
-    var shouldDeleteRoughness = false
+    @AppStorage("capture.shouldDeleteUSDAFiles") var shouldDeleteUSDAFiles = true
+    @AppStorage("capture.shouldDeleteAO") var shouldDeleteAO = false
+    @AppStorage("capture.shouldDeleteDisplacement") var shouldDeleteDisplacement = false
+    @AppStorage("capture.shouldDeleteNormal") var shouldDeleteNormal = false
+    @AppStorage("capture.shouldDeleteRoughness") var shouldDeleteRoughness = false
 
-    // Reference to the last generated OBJ file
-    @Published var lastGeneratedOBJ: URL?
 
     private var currentSession: PhotogrammetrySession?
 
@@ -32,7 +31,7 @@ public class PhotogrammetryManager: ObservableObject {
     private init() { }  // Prevent multiple instances
 
     // Launches a photogrammetry session with specified configuration
-    public func startCapture(inputFolder: URL, outputFolder: URL, fileName: String,
+    @MainActor public func startCapture(photos: [URL], outputFolder: URL, fileName: String,
                              detail: PhotogrammetrySession.Request.Detail,
                              sampleOrdering: PhotogrammetrySession.Configuration.SampleOrdering,
                              featureSensitivity: PhotogrammetrySession.Configuration.FeatureSensitivity,
@@ -40,137 +39,129 @@ public class PhotogrammetryManager: ObservableObject {
                              maskMode: MaskMode,
                              compressImages: Bool,
                              compressionQuality: CGFloat,
+                             onEvent: @escaping (String) -> Void,
                              onProgressUpdate: @escaping (Double) -> Void,
                              onCompletion: @escaping (URL) -> Void,
                              onError: @escaping (String) -> Void) async {
         guard PhotogrammetrySession.isSupported else {
-            print("Photogrammetry unsupported by this machine.")
+            onError("Photogrammetry unsupported by this machine.")
             return
         }
         do {
             var config = PhotogrammetrySession.Configuration()
+            config.isObjectMaskingEnabled = maskMode == .isolate
             config.sampleOrdering = sampleOrdering
             config.featureSensitivity = featureSensitivity
             
-            // Pre-flight checks for existing destination
-            let request: PhotogrammetrySession.Request
-            var outputURL: URL
-            
-            if exportFormat == "OBJ" {
-                let objFolder = outputFolder.appendingPathComponent(fileName, isDirectory: true)
-                var isDir: ObjCBool = false
-                let exists = FileManager.default.fileExists(atPath: objFolder.path, isDirectory: &isDir) && isDir.boolValue
-                if exists {
-                    let msg = NSLocalizedString("The model folder already exists. Choose another name or delete the existing folder.", comment: "Error when target OBJ folder already exists")
-                    onError(msg)
-                    return
-                }
-                try FileManager.default.createDirectory(at: objFolder, withIntermediateDirectories: true)
-                request = makeModelFileRequest(url: objFolder, detail: detail, mask: maskMode)
-                outputURL = objFolder.appendingPathComponent("\(fileName).obj")
-                print("Export OBJ file to: \(objFolder.path) with mask: \(maskMode.rawValue)")
-            } else {
-                outputURL = outputFolder.appendingPathComponent("\(fileName).usdz")
-                if FileManager.default.fileExists(atPath: outputURL.path) {
-                    let msg = NSLocalizedString("A USDZ file with this name already exists. Choose another name or delete the existing file.", comment: "Error when target USDZ file already exists")
-                    onError(msg)
-                    return
-                }
-                request = makeModelFileRequest(url: outputURL, detail: detail, mask: maskMode)
-                print("Export USDZ file to: \(outputURL.path) with mask: \(maskMode.rawValue)")
+            let isOBJ = exportFormat == "OBJ"
+            let name = isOBJ ? fileName : fileName + ".usdz"
+            let destination = outputFolder.appendingPathComponent(name, isDirectory: isOBJ)
+            guard !FileManager.default.fileExists(atPath: destination.path) else {
+                onError(NSLocalizedString("A model with this name already exists.", comment: "Reconstruction output conflict"))
+                return
             }
+            // Publish only completed output. Keeping staging beside the destination allows a volume-local move.
+            let staging = outputFolder.appendingPathComponent(".ipa-" + UUID().uuidString, isDirectory: true)
+            try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: false)
+            defer { try? FileManager.default.removeItem(at: staging) }
+            let outputURL = staging.appendingPathComponent(name, isDirectory: isOBJ)
+            if isOBJ { try FileManager.default.createDirectory(at: outputURL, withIntermediateDirectories: false) }
+            let request = PhotogrammetrySession.Request.modelFile(url: outputURL, detail: detail)
 
+            // RealityKit reads the original files through these per-run links.
+            let inputFolder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+            try FileManager.default.createDirectory(at: inputFolder, withIntermediateDirectories: true)
+            defer { try? FileManager.default.removeItem(at: inputFolder) }
+            for (index, url) in photos.enumerated() {
+                let name = String(format: "%08d", index) + "." + url.pathExtension
+                try FileManager.default.createSymbolicLink(at: inputFolder.appendingPathComponent(name), withDestinationURL: url)
+            }
+            onEvent("Input: \(photos.count) photos. Output: \(destination.path)")
             let session = try PhotogrammetrySession(input: inputFolder, configuration: config)
             self.currentSession = session
             
-            Task {
-                do {
-                    for try await output in session.outputs {
-                        switch output {
-                        case .processingComplete:
-                            print("Process complete")
-                            self.currentSession = nil
-                            
-                            await MainActor.run {
-                                if SettingsManager.instance.enableSound {
-                                    SoundPlayer.playSound(named: "success_capture")
-                                }
-                            }
-                            
-                            if self.shouldDeleteUSDAFiles && exportFormat == "OBJ" {
-                                let objFolder = outputFolder.appendingPathComponent(fileName, isDirectory: true)
-                                print("Suppression activée, tentative de suppression dans : \(objFolder.path)")
-                                deleteFiles(in: objFolder)
-                            }
-                            if exportFormat == "OBJ" {
-                                let objFolder = outputFolder.appendingPathComponent(fileName, isDirectory: true)
-                                var foundOBJ: URL?
-                                var waitTime = 0
-                                while foundOBJ == nil && waitTime < 10 {
-                                    let files = try FileManager.default.contentsOfDirectory(at: objFolder, includingPropertiesForKeys: nil)
-                                    foundOBJ = files.first(where: { $0.pathExtension.lowercased() == "obj" })
-                                    if foundOBJ == nil {
-                                        try await Task.sleep(nanoseconds: 500_000_000)
-                                        waitTime += 1
-                                    }
-                                }
-                                
-                                if let originalOBJ = foundOBJ {
-                                    print("OBJ file found: \(originalOBJ.path)")
-                                    let renamedOBJ = try self.renameExportedAssets(originalOBJ: originalOBJ,
-                                                                                   outputFolder: outputFolder)
-                                    if compressImages {
-                                        do {
-                                            try self.compressImages(in: objFolder, quality: compressionQuality)
-                                        } catch {
-                                            print("Compression image error: \(error.localizedDescription)")
-                                        }
-                                    }
-                                    PhotogrammetryManager.shared.lastGeneratedOBJ = renamedOBJ
-                                    print("lastGeneratedOBJ updated: \(renamedOBJ.path)")
-                                    onCompletion(renamedOBJ)
-                                } else {
-                                    print("No OBJ file found in \(objFolder.path)")
-                                    let msg = NSLocalizedString("No 3D OBJ file was created.", comment: "Error when no OBJ was generated")
-                                    onError(msg)
-                                }
-                            } else {
-                                // For USDZ, ensure the file exists (allow short delay)
-                                var exists = FileManager.default.fileExists(atPath: outputURL.path)
-                                var checks = 0
-                                while !exists && checks < 10 {
-                                    try await Task.sleep(nanoseconds: 200_000_000)
-                                    exists = FileManager.default.fileExists(atPath: outputURL.path)
-                                    checks += 1
-                                }
-                                if exists {
-                                    PhotogrammetryManager.shared.lastGeneratedOBJ = outputURL
-                                    print("lastGeneratedOBJ updated (USDZ): \(outputURL.path)")
-                                    onCompletion(outputURL)
-                                } else {
-                                    let msg = NSLocalizedString("No 3D USDZ file was created.", comment: "Error when no USDZ was generated")
-                                    onError(msg)
-                                }
-                            }
-                        case .requestError(_, let error):
-                            print("Error: \(error.localizedDescription)")
-                            onError(error.localizedDescription)
-                        case .requestProgress(_, let fractionComplete):
-                            DispatchQueue.main.async {
-                                onProgressUpdate(fractionComplete)
-                            }
-                        default:
-                            break
+            defer { currentSession = nil }
+            try session.process(requests: [request])
+            for try await output in session.outputs {
+                onEvent(String(describing: output))
+                switch output {
+                case .processingComplete:
+                    print("Process complete")
+
+                    await MainActor.run {
+                        if SettingsManager.instance.enableSound {
+                            SoundPlayer.playSound(named: "success_capture")
                         }
                     }
-                } catch {
-                    print("Processing error: \(error.localizedDescription)")
-                    self.currentSession = nil
+
+                    if exportFormat == "OBJ" {
+                        let objFolder = outputURL
+                        print("Suppression activée, tentative de suppression dans : \(objFolder.path)")
+                        deleteFiles(in: objFolder)
+                    }
+                    if exportFormat == "OBJ" {
+                        let objFolder = outputURL
+                        var foundOBJ: URL?
+                        var waitTime = 0
+                        while foundOBJ == nil && waitTime < 10 {
+                            let files = try FileManager.default.contentsOfDirectory(at: objFolder, includingPropertiesForKeys: nil)
+                            foundOBJ = files.first(where: { $0.pathExtension.lowercased() == "obj" })
+                            if foundOBJ == nil {
+                                try await Task.sleep(nanoseconds: 500_000_000)
+                                waitTime += 1
+                            }
+                        }
+
+                        if let originalOBJ = foundOBJ {
+                            print("OBJ file found: \(originalOBJ.path)")
+                            let renamedOBJ = try self.renameExportedAssets(originalOBJ: originalOBJ)
+                            if compressImages {
+                                do {
+                                    try self.compressImages(in: objFolder, quality: compressionQuality)
+                                } catch {
+                                    print("Compression image error: \(error.localizedDescription)")
+                                }
+                            }
+                            try FileManager.default.moveItem(at: outputURL, to: destination)
+                            onCompletion(destination.appendingPathComponent(renamedOBJ.lastPathComponent))
+                        } else {
+                            print("No OBJ file found in \(objFolder.path)")
+                            let msg = NSLocalizedString("No 3D OBJ file was created.", comment: "Error when no OBJ was generated")
+                            onError(msg)
+                        }
+                    } else {
+                        // For USDZ, ensure the file exists (allow short delay)
+                        var exists = FileManager.default.fileExists(atPath: outputURL.path)
+                        var checks = 0
+                        while !exists && checks < 10 {
+                            try await Task.sleep(nanoseconds: 200_000_000)
+                            exists = FileManager.default.fileExists(atPath: outputURL.path)
+                            checks += 1
+                        }
+                        if exists {
+                            try FileManager.default.moveItem(at: outputURL, to: destination)
+                            onCompletion(destination)
+                        } else {
+                            let msg = NSLocalizedString("No 3D USDZ file was created.", comment: "Error when no USDZ was generated")
+                            onError(msg)
+                        }
+                    }
+                    return
+                case .requestError(_, let error):
+                    print("Error: \(error.localizedDescription)")
                     onError(error.localizedDescription)
+                    return
+                case .processingCancelled:
+                    onError("Reconstruction cancelled.")
+                    return
+                case .requestProgress(_, let fractionComplete):
+                    DispatchQueue.main.async {
+                        onProgressUpdate(fractionComplete)
+                    }
+                default:
+                    break
                 }
             }
-            
-            try session.process(requests: [request])
         } catch {
             print("Session initialization error: \(error.localizedDescription)")
             onError(error.localizedDescription)
@@ -178,14 +169,14 @@ public class PhotogrammetryManager: ObservableObject {
     }
     
     // Cancels an active photogrammetry session
-    public func stopCapture() {
+    @MainActor public func stopCapture() {
         currentSession?.cancel()
         currentSession = nil
         print("Process stoped by user")
     }
 
     // Renames exported OBJ/MTL and texture assets to match specimen/bone naming rules
-    private func renameExportedAssets(originalOBJ: URL, outputFolder: URL) throws -> URL {
+    private func renameExportedAssets(originalOBJ: URL) throws -> URL {
         let fileManager = FileManager.default
         let modelFolder = originalOBJ.deletingLastPathComponent()
 
@@ -195,10 +186,7 @@ public class PhotogrammetryManager: ObservableObject {
                 .replacingOccurrences(of: "\t", with: "_")
         }
 
-        let specimenName = sanitized(outputFolder.deletingLastPathComponent().lastPathComponent)
-        let boneName = sanitized(outputFolder.lastPathComponent)
-        let baseComponents = [specimenName, boneName].filter { !$0.isEmpty }
-        let baseName = baseComponents.isEmpty ? boneName : baseComponents.joined(separator: "_")
+        let baseName = sanitized(modelFolder.lastPathComponent)
 
         var objURL = originalOBJ
         var mtlURL: URL?
@@ -325,11 +313,6 @@ public class PhotogrammetryManager: ObservableObject {
     }
 
     // Builds a model export request with specified mask mode
-    private func makeModelFileRequest(url: URL, detail: PhotogrammetrySession.Request.Detail, mask: MaskMode) -> PhotogrammetrySession.Request {
-        print("Mask use: \(mask.rawValue)")
-        return .modelFile(url: url, detail: detail)
-    }
-
     // Compresses texture images in the export folder.
     private func compressImages(in folder: URL, quality: CGFloat) throws {
         let fileManager = FileManager.default

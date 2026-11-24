@@ -94,7 +94,7 @@ final class BarcodeDetector {
                 let tileWidth = min(tileSize, width - x)
                 let tileRect = CGRect(x: x, y: y, width: tileWidth, height: tileHeight)
                 if let tileImage = makeTileImage(from: cgImage, rect: tileRect) {
-                    let offset = CGPoint(x: CGFloat(x), y: CGFloat(y))
+                    let offset = CGPoint(x: CGFloat(x), y: CGFloat(height - y - tileHeight))
                     let regions = try detect(on: tileImage, symbologies: symbologies, offset: offset)
                     aggregated.append(contentsOf: regions)
                     tileCount += 1
@@ -134,6 +134,9 @@ final class BarcodeDetector {
                         text: payload.isEmpty ? "Micro QR" : payload,
                         confidence: observation.confidence,
                         boundingBox: globalRect,
+                        corners: [observation.topLeft, observation.topRight, observation.bottomRight, observation.bottomLeft].map {
+                            CGPoint(x: $0.x * imageSize.width + offset.x, y: $0.y * imageSize.height + offset.y)
+                        },
                         area: Double(globalRect.width * globalRect.height)
                     )
                 )

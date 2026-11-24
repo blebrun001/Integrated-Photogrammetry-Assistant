@@ -10,6 +10,7 @@ struct OCRTextRegion: Identifiable, Hashable {
     let text: String
     let confidence: Float
     let boundingBox: CGRect
+    var corners: [CGPoint] = []
     let area: Double
 }
 

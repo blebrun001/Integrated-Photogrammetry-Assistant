@@ -50,6 +50,17 @@
                ReferencedContainer = "container:IPA.xcodeproj">
             </BuildableReference>
          </TestableReference>
+         <TestableReference
+            skipped = "NO"
+            parallelizable = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "42CCC10D2D55182D0037123A"
+               BuildableName = "IPAUITests.xctest"
+               BlueprintName = "IPAUITests"
+               ReferencedContainer = "container:IPA.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
       </Testables>
    </TestAction>
    <LaunchAction

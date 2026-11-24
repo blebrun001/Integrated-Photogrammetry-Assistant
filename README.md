@@ -4,17 +4,27 @@
 
 # Integrated Photogrammetry Assistant
 
-Integrated Photogrammetry Assistant is a macOS application developed at IPHES-CERCA by Brice Lebrun to streamline the production, scaling, organisation, and publication of osteological 3D datasets. The toolkit brings together photogrammetry automation, OBJ post-processing utilities, dataset preparation helpers, and Dataverse publishing tools inside a single interface.
+Integrated Photogrammetry Assistant 2 is a macOS application developed at IPHES-CERCA by Brice Lebrun for reconstructing, documenting and publishing archaeological objects. Each session works with one object. Source photos stay at their original locations.
 
-## Key Capabilities
-- Photogrammetry capture orchestration with automated clean-up and optional texture compression.
-- Semi-automatic and manual OBJ scaling workflows, including Micro QR-based measurement extraction.
-- Interactive 3D viewer with measurement scraping and quick transfer to scaling modules.
-- Dataset preparation helpers: README generator, Dataverse uploader, folder templating, and OBJ renaming.
-- Bone folder creation assistant backed by UBERON suggestions.
+## Working with an object
+
+1. Drop photos or a folder into **Photos**. In **Review**, check thumbnails for blur, clipped highlights and clipped shadows. Adjust each tolerance, rerun analysis or select images manually.
+2. Open **Reconstruction** to choose detail, ordering, sensitivity, masking, texture compression and cleanup. Choose an output directory when starting. RealityKit processes the selected images and the resulting OBJ or USDZ opens in the Viewer.
+3. Open **Viewer** directly to inspect an existing model. Orbit the camera, switch between four surface styles, or pick two surface points. In calibration mode enter one or more known distances in centimetres and apply the mean of their scale factors. Drag in rotation mode or enter angles in degrees. **Undo edit** reverses the latest edit.
+4. For an OBJ with a textured Micro QR marker, **Auto Scale** provides an alternative. Select the texture and marker size, detect the symbol, then confirm the factor and choose a copy or replacement. Under **Tools → Print QR markers**, print the PDF on A4 at 100% and check the physical side length before capture.
+
+The photo selection, open model and calibration status last for the current session. Quality tolerances and reconstruction preferences persist between launches. Each model opened from disk starts with an unverified calibration status.
+
+## Scientific illustrations and 3D exchange
+
+The offline Viewer imports and exports OBJ, GLB, glTF, PLY, STL, USDZ and 3MF. Choose a destination when saving. Keep OBJ, MTL and texture files together. For unitless OBJ, STL and PLY, IPA exports coordinates in centimetres. GLB, glTF and USDZ exports use metres, and 3MF declares centimetres. Conversion dialogs describe format-specific losses. The exchange workflow targets static triangle meshes.
+
+Export a PNG of an orthographic view, a multiview plate, a silhouette, an outline profile or a section at a chosen position along the viewing axis. Calibrated models can include a centimetre scale bar.
+
+**Tools** also includes OBJ Renamer, Folder Structure, Bone Folder with UBERON lookup, README Generator and Dataverse Upload. These tools can be used before importing photos.
 
 ## Dataverse Upload Module
-The **Dataverse upload** tab (under *Dataset preparation*) is now a native Integrated Photogrammetry Assistant module. It shares credentials with the global settings screen and requires:
+The **Dataverse upload** tool (under *Tools*) is now a native Integrated Photogrammetry Assistant module. It shares credentials with the global settings screen and requires:
 
 - A Dataverse base URL (e.g. `https://demo.dataverse.org`).
 - An API key with write access to the target dataset.
@@ -41,11 +51,11 @@ The **Dataverse upload** tab (under *Dataset preparation*) is now a native Integ
   - `Modules/` – Feature groups (3D creation, dataset preparation, file management).
   - `Assets.xcassets/`, `Sounds/`, `Preview Content/` – Media and design resources.
 - `IPATests/`, `IPAUITests/` – Unit and UI test targets.
-- `assets/` – Marketing and documentation assets.
+- `ViewerKit/` – Source and pinned npm dependencies for the bundled offline Viewer.
 
 ## Requirements
-- macOS 13 Ventura or later.
-- Xcode 15 or later with the Swift 5.9 toolchain.
+- macOS 15.2 or later.
+- Xcode 16.2 or later with a macOS 15.2 or newer SDK.
 - Apple Silicon or Intel Mac capable of running RealityKit photogrammetry workflows.
 
 ## Getting Started
@@ -60,7 +70,7 @@ Tagged versions matching `v*` are built by GitHub Actions as unsigned macOS rele
 Because release builds are unsigned and not notarized, macOS Gatekeeper will warn before opening the downloaded app.
 
 ## Localization
-Integrated Photogrammetry Assistant ships with four fully translated interfaces:
+Integrated Photogrammetry Assistant supports four interface languages:
 - English *(default UI language)*
 - French
 - Spanish
@@ -69,6 +79,10 @@ Integrated Photogrammetry Assistant ships with four fully translated interfaces:
 The active language can be changed at runtime from the toolbar globe button. Switching languages restarts the app to reload localized resources.
 
 ## Development Notes
+
+- The bundled Viewer builds with the app offline. After editing its JavaScript sources, run `cd ViewerKit && npm ci && npm run build` to refresh the checked-in bundle.
+- In `ViewerKit`, run `npx playwright-core install chromium` and `npm test` to check textured round trips, units, calibration, rotations and the graphical scale. Set `CHROME_PATH` to use an existing Chrome installation.
+- The optional reconstruction integration test accepts a photo directory via `TEST_RUNNER_IPA_CAPTURE_FIXTURE` when running `xcodebuild test`. It reconstructs a preview in a temporary directory and opens it in the embedded Viewer.
 - Project preferences are stored via `AppStorage` in `SettingsManager`.
 - Photogrammetry sessions are coordinated by `PhotogrammetryManager`, which also supervises export clean-up.
 - Micro QR detection and auto-scaling live inside `AutoScaleViewModel` and related views.

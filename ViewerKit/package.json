@@ -1,0 +1,16 @@
+{
+  "dependencies": {
+    "fflate": "^0.8.3",
+    "three": "^0.187.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2",
+    "playwright-core": "^1.65.1"
+  },
+  "name": "ipa-viewer",
+  "private": true,
+  "scripts": {
+    "build": "esbuild viewer.js --bundle --minify --legal-comments=eof --outfile=\"../IPA/Modules/3D creation/Viewer/Resources/viewer.js\"",
+    "test": "node --test viewer.test.cjs"
+  }
+}

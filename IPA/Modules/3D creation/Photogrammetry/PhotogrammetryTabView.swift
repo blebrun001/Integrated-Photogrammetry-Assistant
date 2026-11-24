@@ -10,6 +10,7 @@ struct PhotogrammetryTabView: View {
     @EnvironmentObject var settings: SettingsManager
     
     @ObservedObject var viewModel: PhotogrammetryViewModel
+    @EnvironmentObject var photos: PhotoSession
     private let photogrammetry = PhotogrammetryManager.shared
 
     // Available export formats
@@ -18,7 +19,7 @@ struct PhotogrammetryTabView: View {
     }
 
     // Texture compression levels
-    enum TextureCompressionLevel: CaseIterable, Identifiable {
+    enum TextureCompressionLevel: String, CaseIterable, Identifiable {
         case none, low, medium, high
 
         var id: Self { self }
@@ -33,69 +34,12 @@ struct PhotogrammetryTabView: View {
         }
     }
     
-    // Local toggles bound to shared deletion flags
-    @State private var shouldDeleteUSDAFiles = true
-    @State private var shouldDeleteAO = false
-    @State private var shouldDeleteDisplacement = false
-    @State private var shouldDeleteNormal = false
-    @State private var shouldDeleteRoughness = false
-
     // Error alert state
     @State private var showErrorAlert = false
     @State private var errorMessage: String = ""
     
     var body: some View {
         VStack(alignment: .leading, spacing: 15) {
-            // Main folder selection (specimen root)
-            VStack(alignment: .leading, spacing: 10) {
-                Text(NSLocalizedString("Specimen", comment: "Section title for specimen selection"))
-                    .font(.headline)
-                HStack {
-                    if let folder = viewModel.mainFolder {
-                        Text(folder.lastPathComponent)
-                            .foregroundColor(.secondary)
-                            .lineLimit(1)
-                    } else {
-                        Text(NSLocalizedString("No folder selected.", comment: "Message when no folder is chosen"))
-                            .foregroundColor(.gray)
-                    }
-                    Button(NSLocalizedString("Choose", comment: "Button to choose folder")) { selectMainFolder() }
-                }
-                .padding()
-                .background(RoundedRectangle(cornerRadius: 8).stroke(Color.gray, lineWidth: 2))
-                .onDrop(of: [UTType.folder.identifier], isTargeted: nil) { providers in
-                    handleMainFolderDrop(providers: providers)
-                }
-            }
-
-            // Subfolder selection (individual bone/photo set)
-            if !viewModel.subFolders.isEmpty {
-                VStack(alignment: .leading, spacing: 10) {
-                    VStack(alignment: .leading, spacing: 10) {
-                    Text(NSLocalizedString("Bone", comment: "Section title for bone selection"))
-                        .font(.headline)
-
-                    List(viewModel.subFolders.sorted(by: { $0.lastPathComponent < $1.lastPathComponent }), id: \.self, selection: $viewModel.selectedSubFolder) { folder in
-                        Text(folder.lastPathComponent)
-                            .onTapGesture {
-                                viewModel.selectedSubFolder = folder
-                            }
-                    }
-                    .frame(maxHeight: 300) // Définit une hauteur maximale avec scroll intégré
-                }
-                    .onChange(of: viewModel.selectedSubFolder) {
-                        if let sub = viewModel.selectedSubFolder {
-                            viewModel.inputFolder = sub.appendingPathComponent("photos")
-                            viewModel.fileName = sub.lastPathComponent
-                            if viewModel.exportFormat == .obj {
-                                viewModel.outputFolder = sub
-                            }
-                        }
-                    }
-                }
-                .padding(.vertical)
-            }
-
             // Parameters and export options
             HStack {
                 (Text(NSLocalizedString("3D model name", comment: "Label for 3D model name field")) + Text(":"))
@@ -109,11 +53,6 @@ struct PhotogrammetryTabView: View {
                     Text(NSLocalizedString("OBJ", comment: "Export format OBJ" )).tag(ExportFormat.obj)
                 }
                 .pickerStyle(SegmentedPickerStyle())
-                .onChange(of: viewModel.exportFormat) {
-                    if viewModel.exportFormat == .obj, let sub = viewModel.selectedSubFolder {
-                        viewModel.outputFolder = sub
-                    }
-                }
             }
 
             HStack {
@@ -201,7 +140,6 @@ struct PhotogrammetryTabView: View {
                         SoundPlayer.playSound(named: "stop_capture")
                     }
                     photogrammetry.stopCapture()
-                    viewModel.isProcessing = false
                     viewModel.statusMessage = NSLocalizedString("Process stopped by user.", comment: "Status when user stops photogrammetry")
                 }
                 .disabled(!viewModel.isProcessing)
@@ -229,7 +167,8 @@ struct PhotogrammetryTabView: View {
                 .foregroundColor(.blue)
                 .padding(.top, 10)
 
-            Spacer()
+            ScrollView { Text(viewModel.log.joined(separator: "\n")).font(.system(.caption, design: .monospaced)).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading) }
+            Spacer(minLength: 0)
         }
         .padding()
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -240,61 +179,21 @@ struct PhotogrammetryTabView: View {
         }
     }
     
-    // MARK: - Folder Selection Helpers
-    
-    // Opens folder picker for main specimen folder
-    private func selectMainFolder() {
+    private func startCapture() {
+        let input = photos.selected
+        let name = viewModel.fileName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !input.isEmpty, !name.isEmpty, name != ".", name != "..", !name.contains("/") else {
+            viewModel.statusMessage = "Select photos and enter a valid model name."
+            return
+        }
         let panel = NSOpenPanel()
+        panel.prompt = "Choose output folder"
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
-        panel.allowsMultipleSelection = false
-        if panel.runModal() == .OK, let url = panel.url {
-            viewModel.mainFolder = url
-            loadSubFolders(from: url)
-        }
-    }
-    
-    // Loads all visible subfolders inside the main folder
-    private func loadSubFolders(from url: URL) {
-        do {
-            let items = try FileManager.default.contentsOfDirectory(at: url, includingPropertiesForKeys: [.isDirectoryKey], options: [.skipsHiddenFiles])
-            viewModel.subFolders = items.filter { item in
-                (try? item.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
-            }
-        } catch {
-            let template = NSLocalizedString("Main folder read error: %@", comment: "Status when reading main folder fails")
-            viewModel.statusMessage = String(format: template, error.localizedDescription)
-        }
-    }
-    
-    // Handles folder drop into the UI
-    private func handleMainFolderDrop(providers: [NSItemProvider]) -> Bool {
-        if let provider = providers.first {
-            provider.loadItem(forTypeIdentifier: UTType.folder.identifier, options: nil) { (urlData, error) in
-                DispatchQueue.main.async {
-                    if let url = urlData as? URL {
-                        self.viewModel.mainFolder = url
-                        self.loadSubFolders(from: url)
-                    }
-                }
-            }
-            return true
-        }
-        return false
-    }
-    
-    // MARK: - Photogrammetry Start
-
-    // Starts the photogrammetry process using the configured options
-    private func startCapture() {
-        guard let input = viewModel.inputFolder, let output = viewModel.outputFolder else {
-            viewModel.statusMessage = NSLocalizedString("Please select main folder and sub-folder containing a 'photos' folder.", comment: "Status when folder selection is incomplete")
-            return
-        }
-        guard FileManager.default.fileExists(atPath: input.path) else {
-            viewModel.statusMessage = NSLocalizedString("No 'photos' folder in selected sub-folder.", comment: "Status when photos folder missing")
-            return
-        }
+        panel.canCreateDirectories = true
+        guard panel.runModal() == .OK, let output = panel.url else { return }
+        viewModel.log = []
+        viewModel.savePreferences()
         viewModel.isProcessing = true
         viewModel.progress = 0.0
         viewModel.statusMessage = NSLocalizedString("Processing", comment: "Status while photogrammetry is running")
@@ -302,9 +201,9 @@ struct PhotogrammetryTabView: View {
         
         Task {
             await photogrammetry.startCapture(
-                inputFolder: input,
+                photos: input,
                 outputFolder: output,
-                fileName: viewModel.fileName,
+                fileName: name,
                 detail: viewModel.detail,
                 sampleOrdering: viewModel.sampleOrdering,
                 featureSensitivity: viewModel.featureSensitivity,
@@ -312,12 +211,14 @@ struct PhotogrammetryTabView: View {
                 maskMode: viewModel.maskMode,
                 compressImages: viewModel.textureCompressionLevel != .none,
                 compressionQuality: compressionQualityValue(for: viewModel.textureCompressionLevel),
+                onEvent: { event in DispatchQueue.main.async { viewModel.log.append(event) } },
                 onProgressUpdate: { newProgress in
                     DispatchQueue.main.async { self.viewModel.progress = newProgress }
                 },
                 onCompletion: { fileURL in
                     DispatchQueue.main.async {
                         self.viewModel.isProcessing = false
+                        NotificationCenter.default.post(name: .openModel, object: fileURL)
                         let duration = Date().timeIntervalSince(self.viewModel.startTime ?? Date())
                         let durationString = String(format: NSLocalizedString("%.2f", comment: "Two-decimal duration"), duration)
                         let template = NSLocalizedString("Processed in %@ sec. File: %@", comment: "Status after photogrammetry completes")

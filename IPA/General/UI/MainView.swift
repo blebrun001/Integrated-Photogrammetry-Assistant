@@ -1,216 +1,84 @@
-// MainView.swift
-// Main interface with sidebar navigation and dynamic module display based on selected section.
-
-
 import SwiftUI
 
 extension Notification.Name {
     static let openDataverseUpload = Notification.Name("IPA.OpenDataverseUpload")
-}
-
-// Enum representing each application section (tab)
-enum AppSection: String, CaseIterable, Identifiable {
-    case photogrammetry
-    case autoScale
-    case objScaling
-    case viewer
-    case objRenamer
-    case folderStructure
-    case readmeGenerator
-    case dataverseUpload
-    case boneFolder
-    
-    var id: String { rawValue }
-    
-    // System SF Symbols icon for each section
-    var systemImage: String {
-        switch self {
-        case .photogrammetry:      return "cube.box"
-        case .autoScale:           return "ruler"
-        case .objScaling:          return "arrow.up.left.and.arrow.down.right"
-        case .viewer:              return "dot.viewfinder"
-        case .objRenamer:          return "text.badge.plus"
-        case .folderStructure:     return "folder"
-        case .readmeGenerator:     return "doc.text"
-        case .dataverseUpload:     return "square.and.arrow.up"
-        case .boneFolder:          return "bolt"
-        }
-    }
-    
-    // Ordering index used to keep the sidebar sequence consistent
-    var sortIndex: Int {
-        AppSection.allCases.firstIndex(of: self) ?? 0
-    }
-
-    // Logical category used for grouping in the sidebar
-    var category: SectionCategory {
-        switch self {
-        case .photogrammetry, .autoScale, .objScaling, .viewer:
-            return .creation
-        case .objRenamer, .folderStructure, .boneFolder:
-            return .files
-        case .readmeGenerator, .dataverseUpload:
-            return .dataset
-        }
-    }
-    
-    // Localized title exposed to UI components
-    var localizedTitle: String {
-        switch self {
-        case .photogrammetry:
-            return NSLocalizedString("Photogrammetry", comment: "Sidebar entry for photogrammetry tools")
-        case .autoScale:
-            return NSLocalizedString("Auto Scale", comment: "Sidebar entry for semi-automatic scaling")
-        case .objScaling:
-            return NSLocalizedString("OBJ Scaling", comment: "Sidebar entry for OBJ scaling module")
-        case .viewer:
-            return NSLocalizedString("Viewer", comment: "Sidebar entry for 3D viewer")
-        case .objRenamer:
-            return NSLocalizedString("OBJ Renamer", comment: "Sidebar entry for OBJ renaming tool")
-        case .folderStructure:
-            return NSLocalizedString("Folder Structure", comment: "Sidebar entry for folder structure generator")
-        case .readmeGenerator:
-            return NSLocalizedString("README Generator", comment: "Sidebar entry for README generator")
-        case .dataverseUpload:
-            return NSLocalizedString("Dataverse Upload", comment: "Sidebar entry for Dataverse upload module")
-        case .boneFolder:
-            return NSLocalizedString("Bone Folder", comment: "Sidebar entry for bone folder utility")
-        }
-    }
-}
-
-// Sidebar categories used to group modules by purpose
-enum SectionCategory: CaseIterable, Hashable {
-    case creation
-    case files
-    case dataset
-    
-    var sortIndex: Int {
-        switch self {
-        case .creation: return 0
-        case .files:    return 1
-        case .dataset:  return 2
-        }
-    }
-    
-    var localizedTitle: String {
-        switch self {
-        case .creation:
-            return NSLocalizedString("3D creation", comment: "Sidebar group title for 3D creation tools")
-        case .files:
-            return NSLocalizedString("Files management", comment: "Sidebar group title for file management tools")
-        case .dataset:
-            return NSLocalizedString("Dataset preparation", comment: "Sidebar group title for dataset preparation tools")
-        }
-    }
+    static let openModel = Notification.Name("IPA.OpenModel")
+    static let autoScaledModel = Notification.Name("IPA.AutoScaledModel")
 }
 
 struct MainView: View {
-    
-    // Currently selected section
-    @State private var selectedSection: AppSection = .photogrammetry
-    
-    // ViewModel injection example
-    @EnvironmentObject var photogrammetryVM: PhotogrammetryViewModel
-    
-    // Sections grouped by category
-    private var groupedSections: [(category: SectionCategory, sections: [AppSection])] {
-        Dictionary(grouping: AppSection.allCases, by: { $0.category })
-            .map { ($0.key, $0.value.sorted { $0.sortIndex < $1.sortIndex }) }
-            .sorted { $0.category.sortIndex < $1.category.sortIndex }
+    enum Step: String, CaseIterable { case photos = "Photos", review = "Review", capture = "Reconstruction", viewer = "Viewer", scale = "Auto Scale", tools = "Tools" }
+    enum Tool: String, CaseIterable {
+        case rename = "OBJ Renamer", structure = "Folder Structure", bone = "Bone Folder", readme = "README Generator", upload = "Dataverse Upload", markers = "Print QR markers"
     }
+    @State private var step = Step.photos
+    @State private var tool = Tool.rename
+    @StateObject private var photos = PhotoSession()
+    @StateObject private var viewer = ViewerViewModel()
+    @EnvironmentObject var capture: PhotogrammetryViewModel
+    @EnvironmentObject var scale: AutoScaleViewModel
+    @EnvironmentObject var renamer: OBJRenamerViewModel
+    @EnvironmentObject var readme: ReadmeGeneratorViewModel
+    @EnvironmentObject var folders: FolderStructureViewModel
 
     var body: some View {
-        NavigationSplitView {
-            VStack {
-                List(selection: $selectedSection) {
-                    ForEach(groupedSections, id: \.category) { group in
-                        Section(header: Text(group.category.localizedTitle)) {
-                            ForEach(group.sections, id: \.self) { section in
-                                Label(section.localizedTitle, systemImage: section.systemImage)
-                                    .tag(section)
-                                    .padding(.vertical, 4)
-                                    .contentShape(Rectangle())
-                            }
-                        }
-                    }
+        VStack(spacing: 0) {
+            HStack {
+                ForEach(Step.allCases, id: \.self) { item in
+                    Button { step = item } label: { Text(LocalizedStringKey(item.rawValue)) }
+                        .buttonStyle(.bordered).tint(item == step ? .accentColor : .secondary)
+                        .disabled((item == .review && photos.photos.isEmpty) || (item == .capture && photos.selected.isEmpty && !capture.isProcessing) || (item == .scale && scale.objURL == nil && viewer.source?.pathExtension.lowercased() != "obj"))
                 }
-                .listStyle(.sidebar)
-                .navigationTitle(NSLocalizedString("Tools", comment: "Sidebar navigation title"))
-
                 Spacer()
-
-                // Footer with logo and credits
-                VStack {
-                    Image("AppLogoFooter")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 100, height: 100)
-                        .opacity(0.5)
-                    Text(NSLocalizedString("Version 1.0.0", comment: "Application version in sidebar footer"))
-                        .font(.footnote)
-                        .foregroundColor(.gray)
-                    Text(NSLocalizedString("© 2025 Brice Lebrun", comment: "Application copyright"))
-                        .font(.footnote)
-                        .foregroundColor(.gray)
+                LanguageMenuButton()
+            }.padding(10)
+            Divider()
+            switch step {
+            case .photos, .review:
+                PhotoReview(session: photos, review: step == .review) { step = step == .review ? .capture : .review }
+            case .capture:
+                PhotogrammetryTabView(viewModel: capture).environmentObject(photos)
+            case .viewer: ViewerTabView(model: viewer)
+            case .scale: AutoScaleTabView()
+            case .tools:
+                HStack(spacing: 0) {
+                    List(Tool.allCases, id: \.self, selection: $tool) { entry in Text(LocalizedStringKey(entry.rawValue)).tag(entry) }.frame(width: 170)
+                    Divider()
+                    Group {
+                        switch tool {
+                        case .rename: OBJRenameTabView()
+                        case .structure: FolderStructureTabView()
+                        case .bone: BoneFolderTabView()
+                        case .readme: ReadmeGeneratorTabView()
+                        case .upload: DataverseUploadTabView(suggestedFile: viewer.source)
+                        case .markers: MarkerSheetView()
+                        }
+                    }.frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
-                .padding(.bottom, 10)
             }
-        } detail: {
-            // Dynamic content for the selected section
-            contentView(for: selectedSection)
-                .navigationTitle(selectedSection.localizedTitle)
+        }.frame(minWidth: 920, minHeight: 650)
+        .onReceive(NotificationCenter.default.publisher(for: .openDataverseUpload)) { _ in tool = .upload; step = .tools }
+        .onReceive(NotificationCenter.default.publisher(for: .openModel)) { note in open(note, automatic: false) }
+        .onReceive(NotificationCenter.default.publisher(for: .autoScaledModel)) { note in open(note, automatic: true) }
+        .onChange(of: viewer.source) {
+            guard let url = viewer.source else { return }
+            if url.pathExtension.lowercased() == "obj" { scale.setOBJ(url: url) }
+            else { scale.objURL = nil }
+            let folder = url.deletingLastPathComponent()
+            renamer.folder = folder
+            readme.folder = folder
+            folders.baseDir = folder
         }
-        .frame(minWidth: 800, minHeight: 600)
-        .toolbar {
-            // Language selector
-                    ToolbarItem(placement: .primaryAction) {
-                        LanguageMenuButton()
-                    }
-                }
-        .toolbarRole(.automatic)
-        .onReceive(NotificationCenter.default.publisher(for: .openDataverseUpload)) { _ in
-            selectedSection = .dataverseUpload
-        }
-    }
-    
-    // Returns the view corresponding to the selected section
-    @ViewBuilder
-    private func contentView(for section: AppSection) -> some View {
-        switch section {
-        case .photogrammetry:
-            PhotogrammetryTabView(viewModel: photogrammetryVM)
-        case .autoScale:
-            AutoScaleTabView()
-        case .objScaling:
-            OBJScalingTabView()
-        case .objRenamer:
-            OBJRenameTabView()
-        case .folderStructure:
-            FolderStructureTabView()
-        case .readmeGenerator:
-            ReadmeGeneratorTabView()
-        case .dataverseUpload:
-            DataverseUploadTabView()
-        case .viewer:
-            ViewerTabView()
-        case .boneFolder:
-            BoneFolderTabView()
+        .onChange(of: photos.photos.first?.id) {
+            if let folder = photos.photos.first?.id.deletingLastPathComponent() {
+                capture.mainFolder = folder
+                if folders.baseDir == nil { folders.baseDir = folder }
+                if readme.folder == nil { readme.folder = folder }
+            }
         }
     }
-}
 
-struct MainView_Previews: PreviewProvider {
-    static var previews: some View {
-        MainView()
-            .environmentObject(PhotogrammetryViewModel())
-            .environmentObject(MeasureViewModel())
-            .environmentObject(AutoScaleViewModel())
-            .environmentObject(OBJScalerViewModel())
-            .environmentObject(OBJRenamerViewModel())
-            .environmentObject(ReadmeGeneratorViewModel())
-            .environmentObject(FolderStructureViewModel())
-            .environmentObject(LanguageManager())
-            .environmentObject(BoneFolderViewModel())
+    private func open(_ note: Notification, automatic: Bool) {
+        if let url = note.object as? URL { viewer.open(url, automatic: automatic); step = .viewer }
     }
 }

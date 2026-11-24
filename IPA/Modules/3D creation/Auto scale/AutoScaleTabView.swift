@@ -10,6 +10,9 @@ struct AutoScaleTabView: View {
     @EnvironmentObject var viewModel: AutoScaleViewModel
     @State private var zoomTarget: ZoomTarget? = nil
 
+    @State private var confirmScale = false
+    @State private var replace = false
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
@@ -32,6 +35,14 @@ struct AutoScaleTabView: View {
             .padding()
         }
         .frame(minWidth: 720, minHeight: 600)
+        .alert("Apply scale factor?", isPresented: $confirmScale) {
+            Button("Cancel", role: .cancel) {}
+            Button("Apply") { viewModel.scale(overwrite: replace) }
+        } message: {
+            if let real = viewModel.currentDiagonalValue, let distance = viewModel.uncalibratedDistance {
+                Text("Factor × \((real / distance).formatted())")
+            }
+        }
         .sheet(item: $zoomTarget) { target in
             switch target {
             case .texture:
@@ -318,12 +329,12 @@ struct AutoScaleTabView: View {
 
                 HStack {
                     Button(NSLocalizedString("Create new file (_scaled)", comment: "Button to save scaled copy")) {
-                        viewModel.scale(overwrite: false)
+                        replace = false; confirmScale = true
                     }
                     .disabled(viewModel.uncalibratedDistance == nil || viewModel.isProcessing || !viewModel.isDiagonalInputValid)
 
                     Button(NSLocalizedString("Overwrite original", comment: "Button to overwrite the original file")) {
-                        viewModel.scale(overwrite: true)
+                        replace = true; confirmScale = true
                     }
                     .disabled(viewModel.uncalibratedDistance == nil || viewModel.isProcessing || !viewModel.isDiagonalInputValid)
                 }

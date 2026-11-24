@@ -82,13 +82,6 @@ final class AutoScaleViewModel: ObservableObject {
         selectedMarker = defaults[0]
         realWorldValue = AutoScaleViewModel.formatLength(defaults[0].diagonalLengthCentimeters)
 
-        PhotogrammetryManager.shared.$lastGeneratedOBJ
-            .sink { [weak self] newOBJ in
-                if let url = newOBJ {
-                    self?.setOBJ(url: url)
-                }
-            }
-            .store(in: &cancellables)
     }
 
     private static let lengthFormatter: NumberFormatter = {
@@ -198,6 +191,17 @@ final class AutoScaleViewModel: ObservableObject {
         manualOverride = ""
         selectedRegionPreview = nil
         statusMessage = String(format: NSLocalizedString("OBJ selected: %@. Select a texture to continue.", comment: "Status after selecting OBJ"), url.lastPathComponent)
+        let folder = url.deletingLastPathComponent()
+        if let files = try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil),
+           let material = files.first(where: { $0.pathExtension.lowercased() == "mtl" }),
+           let text = try? String(contentsOf: material, encoding: .utf8),
+           let line = text.split(whereSeparator: \.isNewline).first(where: { $0.hasPrefix("map_Kd ") }) {
+            let filename = line.dropFirst(7).trimmingCharacters(in: .whitespaces)
+            let texture = folder.appendingPathComponent(filename).standardizedFileURL
+            if texture.path.hasPrefix(folder.standardizedFileURL.path + "/"), FileManager.default.isReadableFile(atPath: texture.path) {
+                setTexture(url: texture)
+            }
+        }
     }
 
     func setTexture(url: URL) {
@@ -266,7 +270,7 @@ final class AutoScaleViewModel: ObservableObject {
     }
 
     func select(region: OCRTextRegion) {
-        guard let objURL, let textureSize = textureImage?.size else {
+        guard let objURL, let pixels = textureImage?.cgImageRepresentation else {
             statusMessage = AutoScaleError.missingOBJ.localizedDescription
             return
         }
@@ -281,7 +285,7 @@ final class AutoScaleViewModel: ObservableObject {
                 let measurement = try analyzer.measureDistance(
                     objURL: objURL,
                     boundingBox: region.boundingBox,
-                    textureSize: textureSize
+                    textureSize: CGSize(width: pixels.width, height: pixels.height), corners: region.corners
                 )
                 await MainActor.run {
                     self.uncalibratedDistance = measurement.distance
@@ -328,6 +332,7 @@ final class AutoScaleViewModel: ObservableObject {
                 )
                 await MainActor.run {
                     self.isProcessing = false
+                    NotificationCenter.default.post(name: .autoScaledModel, object: resultURL)
                     self.statusMessage = String(format: NSLocalizedString("Scaled model saved: %@", comment: "Status after scaling"), resultURL.lastPathComponent)
                 }
             } catch {

@@ -11,6 +11,12 @@ struct BoneFolderTabView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             GroupBox(label: Text(NSLocalizedString("Working directory", comment: "Section title for working directory"))) {
+                Button("Choose folder…") {
+                    let panel = NSOpenPanel()
+                    panel.canChooseDirectories = true
+                    panel.canChooseFiles = false
+                    if panel.runModal() == .OK { photogrammetryVM.mainFolder = panel.url }
+                }
                 Text(photogrammetryVM.mainFolder?.path ?? NSLocalizedString("No folder selected.", comment: "Message when no folder is selected"))
                     .font(.caption)
                     .foregroundColor(.gray)

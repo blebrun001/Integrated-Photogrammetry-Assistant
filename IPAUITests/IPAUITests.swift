@@ -23,12 +23,21 @@ final class IPAUITests: XCTestCase {
     }
 
     @MainActor
-    func testExample() throws {
-        // UI tests must launch the application that they test.
+    func testIndependentViewerAndMarkerTool() throws {
         let app = XCUIApplication()
+        app.launchArguments = ["-AppleLanguages", "(en)"]
         app.launch()
-
-        // Use XCTAssert and related functions to verify your tests produce the correct results.
+        let viewer = app.buttons["Viewer"]
+        XCTAssertTrue(viewer.waitForExistence(timeout: 10))
+        XCTAssertFalse(app.buttons["Review"].isEnabled)
+        XCTAssertFalse(app.buttons["Reconstruction"].isEnabled)
+        viewer.click()
+        XCTAssertTrue(app.buttons["Open model…"].exists)
+        app.buttons["Tools"].click()
+        let markers = app.staticTexts["Print QR markers"]
+        XCTAssertTrue(markers.waitForExistence(timeout: 5))
+        markers.click()
+        XCTAssertTrue(app.buttons["Export PDF…"].exists)
     }
 
     @MainActor
